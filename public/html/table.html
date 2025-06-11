@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="uk">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewpoint" content="width=device-width, initial-scale=1.0" />
+        <title>Система обліку студентів для проходження виробничої практики</title>
+        <link rel="stylesheet" type="text/css" href="../css/style.css">
+    </head>
+    <body>
+        <div class="container">
+            <h1>Система обліку студентів для проходження виробничої практики</h1>
+
+            <div id="mainDataTable">
+                <table id="dataTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 2.65%;">№ п/п</th>
+                            <th style="width: 5%">Реєстраційний номер</th>
+                            <th>Дата реєстрації</th>
+                            <th>ПІБ студента</th>
+                            <th>Група</th>
+                            <th>Інформація про компанію</th>
+                            <th>Контактна особа</th>
+                            <th>Вид документу</th>
+                            <th>Статус підписання угоди</th>
+                            <th>Дії</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <button class="open-button" onclick="openForm()">Додати</button>
+        </div>
+
+        <!-- Edit form  -->
+        <div class="form-popup" id="editFormDiv">
+            <form class="Form-container" id="editForm">
+                <h1 id="formHead">Редагувати рядок</h1>
+
+                <input type="hidden" id="editId" />
+                <input type="hidden" id="editRegistrationNumber">
+                <input type="text" placeholder="П.І.Б студента" id="editNameField" required>
+
+                <label for="group">Група</label>
+                <select id="editGroup" required>
+                    <option value="">-Оберіть значення-</option>
+                    <option value="1КН-22б">1КН-22б</option>
+                    <option value="2КН-22б">2КН-22б</option>
+                    <option value="3КН-22б">3КН-22б</option>
+                    <option value="4КН-22б">4КН-22б</option>
+                    <option value="5КН-22б">5КН-22б</option>
+                    <option value="6КН-22б">6КН-22б</option>
+                </select>
+                <div id="groupSelect"></div>
+                <label for="registrationDate"> Дата реєстрації</label>
+                <input type="date" min="1999-01-01" placeholder="Дата реєстрації" id="editRegistrationDate" required>
+                <input type="text" placeholder="Інформація про компанію" id="editInformation">
+                <input type="text" placeholder="Контактна особа" id="editContact">
+
+                <label for="signingStatus">Стан підписання угоди</label>
+                <select id="editSigningStatus" required>
+                    <option value="">-Оберіть значення-</option>
+                    <option value="Підписано">Підписано</option>
+                    <option value="Відхилено">Відхилено</option>
+                    <option value="В обробці">В обробці</option>
+                    <option value="Доопрацювати">Доопрацювати</option>
+                </select>
+
+                <label for="documentType">Вид документу</label>
+                <select id="editDocumentType" required>
+                    <option value="">-Оберіть значення-</option>
+                    <option value="Угода">Угода</option>
+                    <option value="Заява">Заява</option>
+                </select>
+
+                <button type="submit" class="btn">Редагувати</button>
+                <button type="button" class="btn cancel" onclick="closeEditForm()">Відмінити</button>
+            </form>
+        </div>
+
+        <!-- Add form  -->
+        <div class="form-popup" id="addFormDiv">
+            <form class="Form-container" id="addForm">
+                <h1 id="formHead">Додати дані до таблиці</h1>
+
+                <input type="hidden" id="id" />
+                <input type="hidden" id="registrationNumber">
+                <input type="text" placeholder="П.І.Б студента" id="nameField" required>
+
+                <label for="group">Група</label>
+                <select id="group" required>
+                    <option value="">-Оберіть значення-</option>
+                    <option value="1КН-22б">1КН-22б</option>
+                    <option value="2КН-22б">2КН-22б</option>
+                    <option value="3КН-22б">3КН-22б</option>
+                    <option value="4КН-22б">4КН-22б</option>
+                    <option value="5КН-22б">5КН-22б</option>
+                    <option value="6КН-22б">6КН-22б</option>
+                </select>
+                <div id="groupSelect"></div>
+                <label for="registrationDate"> Дата реєстрації</label>
+                <input type="date" min="1999-01-01" placeholder="Дата реєстрації" id="registrationDate" required>
+                <input type="text" placeholder="Інформація про компанію" id="information">
+                <input type="text" placeholder="Контактна особа" id="contact">
+
+                <label for="signingStatus">Стан підписання угоди</label>
+                <select id="signingStatus" required>
+                    <option value="">-Оберіть значення-</option>
+                    <option value="Підписано">Підписано</option>
+                    <option value="Відхилено">Відхилено</option>
+                    <option value="В обробці">В обробці</option>
+                    <option value="Доопрацювати">Доопрацювати</option>
+                </select>
+
+                <label for="documentType">Вид документу</label>
+                <select id="documentType" required>
+                    <option value="">-Оберіть значення-</option>
+                    <option value="Угода">Угода</option>
+                    <option value="Заява">Заява</option>
+                </select>
+
+                <button type="submit" class="btn">Додати</button>
+                <button type="button" class="btn cancel" onclick="closeForm()">Закрити форму</button>
+            </form>
+        </div>
+
+        <footer>Розроблено для Кафедри КН студентом групи 2КН-22Б Міхеєвом В.І.</footer>
+
+        <script>
+            const API_URL = 'http://localhost:3308/table';
+            const tableBody = document.querySelector('#dataTable tbody');
+            const form = document.querySelector('#addForm');
+            const formTitle = document.getElementById('formHead');
+
+            function openForm(){
+                document.getElementById('addFormDiv').style.display = "block";
+            }
+            function closeForm(){
+                document.getElementById('addFormDiv').style.display = "none";
+            }
+
+            function closeEditForm(){
+                document.getElementById('editFormDiv').style.display = "none";
+            }
+
+            async function loadTable(){
+                try{
+                    const res = await fetch(API_URL);
+                    const data = await res.json();
+                    tableBody.innerHTML = '';
+                    data.forEach(row => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${row.ID}</td>
+                            <td>${row.registrationNumber}</td>
+                            <td>${row.registrationDate || ''}</td>
+                            <td>${row.name}</td>
+                            <td>${row.studentGroup || ''}</td>
+                            <td>${row.information || ''}</td>
+                            <td>${row.contact || ''}</td>
+                            <td>${row.documentType || ''}</td>
+                            <td>${row.signingStatus || ''}</td>
+                            <td>
+                                <button onclick="editRow(${JSON.stringify(row).replace(/"/g, '&quot;')})">
+                                    <img src="../images/edit_icon.png" width="25" heigth="35">
+                                </button>
+                                <button onclick="deleteRow(${row.ID})">
+                                    <img src="../images/delete_icon.png" width="25" height="25">
+                                </button>
+                                <button onclick="cloneRow(${row.ID})">
+                                    <img src="../images/duplicate.png" width="25" height="25">
+                                </button>
+                            </td>
+                        `;
+                        tableBody.appendChild(tr);
+                    });
+                } catch (err) {
+                    console.error('Failed to load table: ', err);
+                }
+            }
+
+            function editRow(row){
+                document.getElementById('editFormDiv').style.display = "block";
+                document.getElementById('editId').value = row.ID;
+                document.getElementById('editRegistrationNumber').value = row.registrationNumber;
+                document.getElementById('editNameField').value = row.name;
+                document.getElementById('editGroup').value = row.studentGroup;
+                document.getElementById('editRegistrationDate').value = row.registrationDate;
+                document.getElementById('editInformation').value = row.information;
+                document.getElementById('editContact').value = row.contact;
+                document.getElementById('editSigningStatus').value = row.signingStatus;
+                document.getElementById('editDocumentType').value = row.documentType;
+            }
+
+            async function deleteRow(id){
+                if(confirm('Ви дійсно хочете видалити цей рядок?')){
+                    try{
+                        await fetch(`${API_URL}/${id}`, {method: 'DELETE'})
+                        await loadTable();
+                    } catch(err) {
+                        console.error('Failed to delete row: ', err);
+                    }
+                }
+            }
+
+            async function cloneRow(id){
+                try{
+                    await fetch(`${API_URL}/clone/${id}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': '/application/json'}
+                    });
+                    await loadTable();
+                    console.log('Data cloned successfully!');
+                }catch(err){
+                    console.error('Error' , err);
+                    console.log('Clone failed!');
+                }
+            }
+
+            //--Event listener for edit form--
+            document.getElementById('editForm').addEventListener('submit', async e => {
+                e.preventDefault();
+
+                const id = document.getElementById('editId').value;
+                const data = {
+                    name: document.getElementById('editNameField').value,
+                    registrationDate: document.getElementById('editRegistrationDate').value,
+                    information: document.getElementById('editInformation').value,
+                    contact: document.getElementById('editContact').value,
+                    studentGroup: document.getElementById('editGroup').value,
+                    documentType: document.getElementById('editDocumentType').value,
+                    signingStatus: document.getElementById('editSigningStatus').value
+                }
+
+                try{
+                    const res = await fetch(`${API_URL}/${id}`, {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(data)
+                    });
+                    await res.json();
+                    await loadTable();
+                    closeEditForm();
+                }catch(err) {
+                    console.error('Error: ', err);
+                    console.log('Update failed!');
+                }
+            });
+
+            //--Event listener for add form--
+            document.getElementById('addForm').addEventListener('submit', async e => {
+                e.preventDefault();
+                const id = document.getElementById('id').value;
+                const data = {
+                    name: document.getElementById('nameField').value,
+                    registrationNumber: document.getElementById('registrationNumber').value,
+                    registrationDate: document.getElementById('registrationDate').value,
+                    information: document.getElementById('information').value,
+                    contact: document.getElementById('contact').value,
+                    studentGroup: document.getElementById('group').value,
+                    documentType: document.getElementById('documentType').value,
+                    signingStatus: document.getElementById('signingStatus').value
+                }
+
+                try{
+                    await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                    });
+                    form.reset();
+                    document.getElementById('id').value = '';
+                    await loadTable();
+                }catch(err) {
+                    console.error('Failed to add row: ', err);
+                }
+            });
+
+            loadTable();
+        </script>
+    </body>
+
+
+</html>
