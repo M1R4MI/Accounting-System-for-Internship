@@ -10,20 +10,30 @@
         <div class="container">
             <h1>Система обліку студентів для проходження виробничої практики</h1>
 
+            <!-- Search field for dynamic searching in the table -->
+            <div class ="search-container">
+                <button onclick="" class="filter-button">
+                    <img src="../images/filter.png" class="btnImg">
+                </button>
+                <input type="text" id="searchInput" placeholder="">
+                <button type="button" onclick="searchInTable()" id="searchbtn">Пошук</button>
+            </div>
+
             <div id="mainDataTable">
                 <table id="dataTable">
                     <thead>
                         <tr>
                             <th style="width: 2.65%;">№ п/п</th>
                             <th style="width: 5%">Реєстраційний номер</th>
-                            <th>Дата реєстрації</th>
-                            <th>ПІБ студента</th>
-                            <th>Група</th>
-                            <th>Інформація про компанію</th>
-                            <th>Контактна особа</th>
-                            <th>Вид документу</th>
-                            <th>Статус підписання угоди</th>
-                            <th>Дії</th>
+                            <th style="width: 6.5%">Дата реєстрації</th>
+                            <th style="width: 4%">ПІБ студента</th>
+                            <th style="width: 2%">Група</th>
+                            <th style="width: 30%; text-align: center;">Інформація про місце проходження практики</th>
+                            <th style="width: 8%;">Контактна особа</th>
+                            <th style="width: 1.5%;">Вид документу</th>
+                            <th style="width: 3%;">Статус підписання документа</th>
+                            <th style="width: 3%;">Інструктаж з ОП</th>
+                            <th style="width: 9%; text-align: center;">Дії</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -74,6 +84,13 @@
                     <option value="Заява">Заява</option>
                 </select>
 
+                <label for="editop">Інструктаж з ОП</label>
+                <select id="editop" required>
+                    <option value="">-Оберіть значення-</option>
+                    <option value="Пройшов(-ла)">Пройшов(-ла)</option>
+                    <option value="Не пройшов(-ла)">Не пройшов(-ла)</option>
+                </select>
+
                 <button type="submit" class="btn">Редагувати</button>
                 <button type="button" class="btn cancel" onclick="closeEditForm()">Відмінити</button>
             </form>
@@ -120,6 +137,13 @@
                     <option value="Заява">Заява</option>
                 </select>
 
+                <label for="op">Інструктаж з ОП</label>
+                <select id="op" required>
+                    <option value="">-Оберіть значення-</option>
+                    <option value="Пройшов(-ла)">Пройшов(-ла)</option>
+                    <option value="Не пройшов(-ла)">Не пройшов(-ла)</option>
+                </select>
+
                 <button type="submit" class="btn">Додати</button>
                 <button type="button" class="btn cancel" onclick="closeForm()">Закрити форму</button>
             </form>
@@ -139,7 +163,6 @@
             function closeForm(){
                 document.getElementById('addFormDiv').style.display = "none";
             }
-
             function closeEditForm(){
                 document.getElementById('editFormDiv').style.display = "none";
             }
@@ -161,6 +184,7 @@
                             <td>${row.contact || ''}</td>
                             <td>${row.documentType || ''}</td>
                             <td>${row.signingStatus || ''}</td>
+                            <td>${row.op || ''}</td>
                             <td>
                                 <button onclick="editRow(${JSON.stringify(row).replace(/"/g, '&quot;')})">
                                     <img src="../images/edit_icon.png" width="25" heigth="35">
@@ -215,6 +239,54 @@
                 }catch(err){
                     console.error('Error' , err);
                     console.log('Clone failed!');
+                }
+            }
+
+            async function searchInTable(){
+                const input = document.getElementById('searchInput').value;
+
+                try{
+                    if(input != ''){
+                        const res = await fetch(`${API_URL}/search/${encodeURIComponent(input)}`);
+                        const data = await res.json();
+                        if(data != ''){
+                            tableBody.innerHTML = '';
+                            data.forEach(row => {
+                                const tr = document.createElement('tr');
+                                tr.innerHTML = `
+                                    <td>${row.ID}</td>
+                                    <td>${row.registrationNumber}</td>
+                                    <td>${row.registrationDate || ''}</td>
+                                    <td>${row.name}</td>
+                                    <td>${row.studentGroup || ''}</td>
+                                    <td>${row.information || ''}</td>
+                                    <td>${row.contact || ''}</td>
+                                    <td>${row.documentType || ''}</td>
+                                    <td>${row.signingStatus || ''}</td>
+                                    <td>${row.op || ''}</td>
+                                    <td>
+                                        <button onclick="editRow(${JSON.stringify(row).replace(/"/g, '&quot;')})">
+                                            <img src="../images/edit_icon.png" width="25" heigth="35">
+                                        </button>
+                                        <button onclick="deleteRow(${row.ID})">
+                                            <img src="../images/delete_icon.png" width="25" height="25">
+                                        </button>
+                                        <button onclick="cloneRow(${row.ID})">
+                                            <img src="../images/duplicate.png" width="25" height="25">
+                                        </button>
+                                    </td>
+                                `;
+                                tableBody.appendChild(tr);
+                            });
+                        }else{
+                            alert('Нічого не знайдено!');
+                        }
+                    }else{
+                        loadTable();
+                    }
+                    
+                }catch(err){
+                    console.error('Search failed: ', err);
                 }
             }
 

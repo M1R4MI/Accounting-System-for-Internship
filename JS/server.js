@@ -61,6 +61,24 @@ const app = express();
                 res.status(500).json({ error: 'Internal Server Error', details: err.message });
             }
         });
+
+        app.get('/table/search/:input', async (req, res) => {
+            const input = req.params.input;
+            if (!input) {
+                return res.status(400).json({ error: 'Missing required query parameter: input' });
+            }
+            try{
+                const [results] = await auxiliary.searchInTable(input, db);
+                const formattedResults = results.map(row => ({
+                    ...row,
+                    registrationDate: dateFormat(row.registrationDate).format('DD-MM-YYYY'),
+                }));
+                res.json(formattedResults);
+            } catch(err) {
+                console.error('Error in GET /table/search:', err);
+                res.status(500).json({ error: 'Internal Server Error', details: err.message });
+            }
+        });
         
         //--HTTP clone row method--
         app.post('/table/clone/:id', async (req, res) => {

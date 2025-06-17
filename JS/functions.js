@@ -26,6 +26,21 @@ async function generateRegistrationNumber(departmentID, connection) {
     return newRegistrationNumber;
 }
 
+async function searchInTable(input, connection) {
+    try{
+        const [result] = await connection.query(
+            `SELECT * FROM year2025
+             WHERE name LIKE ? OR registrationNumber LIKE ?`,
+            [`%${input}%`, `%${input}%`]
+        );
+        return [result];
+    }catch(err) {
+        console.error('Error while searching:', err);
+        throw new Error('Database query failed');
+    }
+}
+
 module.exports = {
-    generateRegistrationNumber
+    generateRegistrationNumber,
+    searchInTable
 };

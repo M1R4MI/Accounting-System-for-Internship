@@ -9,5 +9,7 @@ CREATE TABLE year2025(
     information varchar(500),
     contact varchar(255),
     documentType varchar(30),
-    signingStatus varchar(30)
+    signingStatus varchar(30),
+    op varchar(30)
+
 );

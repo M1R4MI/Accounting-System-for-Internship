@@ -1,7 +1,7 @@
 body{
-    background-color: #f3f4f6;
-    min-height: 100vh;
-    font-family: Arial, Helvetica, sans-serif;
+  background-color: #f3f4f6;
+  min-height: 100vh;
+  font-family: Arial, Helvetica, sans-serif;
 }
 
 h1, h2 {
@@ -44,31 +44,31 @@ select {
 }
 
 .open-button{
-    background-color:#a3a3aa;
-    color: white;
-    padding: 16px 20px;
-    border: none;
-    cursor: pointer;
-    opacity: 0.8;
-    position: fixed;
-    bottom: 0px;
-    right: 28px;
-    width: 280px;
+  background-color:#a3a3aa;
+  color: white;
+  padding: 16px 20px;
+  border: none;
+  cursor: pointer;
+  opacity: 0.8;
+  position: fixed;
+  bottom: 4rem;
+  right: 28px;
+  width: 280px;
 }
 
 .form-popup{
-    display: none;
-    position: fixed;
-    bottom: 0;
-    right: 15px;
-    border: 3px solid #f1f1f1;
-    z-index: 9;
+  display: none;
+  position: fixed;
+  bottom: 2rem;
+  right: 15px;
+  border: 3px solid #f1f1f1;
+  z-index: 9;
 }
 
 .Form-container{
-    max-width: 300px;
-    padding: 10px;
-    background-color: white;
+  max-width: 300px;
+  padding: 10px;
+  background-color: white;
 }
 
 
@@ -85,11 +85,67 @@ select {
 }
 
 .Form-container .cancel{
-    background-color: red;
+  background-color: red;
 }
 
 .Form-container .btn:hover, .open-button:hover{
-    opacity: 1;
+  opacity: 1;
+}
+
+.search-container{
+  display: flex;
+  justify-content: end;
+  width: 20rem;
+  margin: 0 1rem auto 0;
+  right:0px;
+  padding: 0.5rem 0 0 0;
+}
+
+.search-container #searchbtn{
+  margin-left: 4px;
+  height: 2rem;
+  border: 1px solid #d1d5db;
+  padding: 0.5rem 1rem;
+  text-align: left;
+  opacity: 0.8;
+  background-color: #d1d5db;
+  border-radius: 0.3rem;
+  cursor: pointer;
+}
+
+.search-container .filter-button{
+  margin-right: 4px;
+  width: 2.5rem;
+  height: 2rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.3rem;
+  text-align: center;
+  align-items: center;
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.btnImg{
+  width: 25px;
+  height: 25px;
+  border: 0;
+  position: static;
+}
+
+.search-container #searchbtn:hover, .filter-button:hover{
+  opacity: 1;
+}
+
+footer{
+  text-align: center;
+  position: fixed;
+  width: 100%;
+  padding: 1rem;
+  background-color: #fff;
+  border-top: 1px solid #d1d5db; /* Tailwind: border-gray-300 */
+  margin-top: 2rem;
+  bottom: 0;
+  left: 0;
 }
 
 table {
