@@ -12,7 +12,7 @@ const app = express();
     try{
         const db = await getDbConnection();
         console.log('Connected to db!');
-        
+
         app.use(cors());
         app.use(bodyParser.json());
         app.use(express.static('../public'));
@@ -23,8 +23,25 @@ const app = express();
             res.sendFile(path.join('public', 'html', 'index.html'));
         });
         
-        app.post('/', (req, res) =>{
+        app.post('/', async (req, res) =>{
             console.log(req.body);
+            try{
+                const [dbRows] = await db.query(`
+                CREATE TABLE IF NOT EXISTS year2025(
+                    ID INT auto_increment primary key,
+                    registrationNumber varchar(30),
+                    registrationDate DATE,
+                    name varchar(255),
+                    studentGroup varchar(30),
+                    information varchar(500),
+                    contact varchar(255),
+                    documentType varchar(30),
+                    signingStatus varchar(30),
+                    op varchar(30)
+                );`);
+            } catch(err) {
+                res.status(500).json(err);
+            }
         });
         
         app.get('/table', async (_, res) => {
@@ -44,16 +61,15 @@ const app = express();
          // This method is used to add a new row to the table with a generated registration number
         app.post('/table', async (req, res) =>{
             try{
-                const { name, date, information, contact, studentGroup, documentType, signingStatus } = req.body;
+                const { name, registrationDate, information, contact, studentGroup, documentType, signingStatus, op } = req.body;
                 
                 if (!name) {
                     return res.status(400).json({ error: 'Missing required field: name' });
-                }                
-                const registrationDate = new Date(date).toISOString().split('T')[0];
+                }
 
                 const registrationNumber = await auxiliary.generateRegistrationNumber('08-32', db);
                 const [result] = await db.query('INSERT INTO year2025 SET ?', 
-                    { name, registrationNumber, registrationDate, information, contact, studentGroup, documentType, signingStatus }
+                    { name, registrationNumber, registrationDate, information, contact, studentGroup, documentType, signingStatus, op }
                 );
                 res.json({ id: result.insertId });
             } catch (err) {
@@ -79,6 +95,26 @@ const app = express();
                 res.status(500).json({ error: 'Internal Server Error', details: err.message });
             }
         });
+
+        app.get('/table/sort/', async (req, res) => {
+            const sortBy = req.query.by || 'name';
+            const order = req.query.order === 'asc' ? 'ASC':'DESC';
+            const allowedFields = ['name', 'registrationDate', 'studentGroup'];
+
+            try{
+                if(!allowedFields.includes(sortBy)){
+                    res.status(400).send('Invalid sort field');
+                }
+                const [results] = await db.query(`SELECT * FROM year2025 ORDER BY ${sortBy} ${order}`);
+                const formattedResults = results.map(row => ({
+                    ...row,
+                    registrationDate: dateFormat(row.registrationDate).format('DD-MM-YYYY'),
+                }));
+                res.json(formattedResults);
+            }catch(err){
+                res.status(500).json({error: 'Cannot sort table by name', details: err.message});
+            }
+        })
         
         //--HTTP clone row method--
         app.post('/table/clone/:id', async (req, res) => {
@@ -92,10 +128,10 @@ const app = express();
                 const row = rows[0];
 
                 const [results] = await db.query(
-                    'INSERT INTO year2025(name, registrationNumber, registrationDate, information, contact, studentGroup, documentType, signingStatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                    'INSERT INTO year2025(name, registrationNumber, registrationDate, information, contact, studentGroup, documentType, signingStatus, op) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
                      [
                         row.name, row.registrationNumber, row.registrationDate, row.information, 
-                        row.contact, row.studentGroup, row.documentType, row.signingStatus
+                        row.contact, row.studentGroup, row.documentType, row.signingStatus, row.op
                     ]
                 );
 
@@ -108,11 +144,11 @@ const app = express();
         
         //--HTTP edit row method--
         app.put('/table/:id', async (req, res) => {
-            const { name, registrationDate, information, contact, studentGroup, documentType, signingStatus } = req.body;
+            const { name, registrationDate, information, contact, studentGroup, documentType, signingStatus, op } = req.body;
             try{
                 await db.query(
-                    'UPDATE year2025 SET name = ?, registrationDate = ?, information = ?, contact = ?, studentGroup = ?, documentType = ?, signingStatus = ? WHERE id = ?',
-                    [name, registrationDate, information, contact, studentGroup, documentType, signingStatus, req.params.id]
+                    'UPDATE year2025 SET name = ?, registrationDate = ?, information = ?, contact = ?, studentGroup = ?, documentType = ?, signingStatus = ?, op = ? WHERE id = ?',
+                    [name, registrationDate, information, contact, studentGroup, documentType, signingStatus, op, req.params.id]
                 );
 
                 res.json({ message: 'Row updated successfully' });

@@ -12,7 +12,7 @@
 
             <!-- Search field for dynamic searching in the table -->
             <div class ="search-container">
-                <button onclick="" class="filter-button">
+                <button id="filterToggle" class="filter-button" onclick="filterToggle()">
                     <img src="../images/filter.png" class="btnImg">
                 </button>
                 <input type="text" id="searchInput" placeholder="">
@@ -32,7 +32,7 @@
                             <th style="width: 8%;">Контактна особа</th>
                             <th style="width: 1.5%;">Вид документу</th>
                             <th style="width: 3%;">Статус підписання документа</th>
-                            <th style="width: 3%;">Інструктаж з ОП</th>
+                            <th style="width: 6%;">Інструктаж з ОП</th>
                             <th style="width: 9%; text-align: center;">Дії</th>
                         </tr>
                     </thead>
@@ -149,6 +149,16 @@
             </form>
         </div>
 
+        <!-- Filter form -->
+        <div class="filterForm-popup" id="filterFormDiv" style="display: none;">
+            <form id="filterForm">
+                <button type="button" class="filterBtn" onclick="sortBy('name')">Сортувати за іменем</button>
+                <button type="button" class="filterBtn" onclick="sortBy('studentGroup')">Сортувати за академ групою</button>
+                <button type="button" class="filterBtn" onclick="sortBy('registrationDate')">Сортувати за датою реєстрації</button>
+                <!-- <button type="button" class="filterBtn">Сортувати за іменем</button> -->
+            </form>
+        </div>
+
         <footer>Розроблено для Кафедри КН студентом групи 2КН-22Б Міхеєвом В.І.</footer>
 
         <script>
@@ -156,22 +166,32 @@
             const tableBody = document.querySelector('#dataTable tbody');
             const form = document.querySelector('#addForm');
             const formTitle = document.getElementById('formHead');
+            let sortOrder = 'asc';
 
             function openForm(){
                 document.getElementById('addFormDiv').style.display = "block";
             }
+
             function closeForm(){
                 document.getElementById('addFormDiv').style.display = "none";
             }
+
             function closeEditForm(){
                 document.getElementById('editFormDiv').style.display = "none";
             }
+            
+            function filterToggle() {
+                let filterDisplayObj = document.getElementById('filterFormDiv');
+                if(filterDisplayObj.style.display === 'none'){
+                    filterDisplayObj.style.display = 'block';
+                }
+                else{
+                    filterDisplayObj.style.display = 'none';
+                }
+            }
 
-            async function loadTable(){
-                try{
-                    const res = await fetch(API_URL);
-                    const data = await res.json();
-                    tableBody.innerHTML = '';
+            function table(data){
+                tableBody.innerHTML = '';
                     data.forEach(row => {
                         const tr = document.createElement('tr');
                         tr.innerHTML = `
@@ -185,7 +205,7 @@
                             <td>${row.documentType || ''}</td>
                             <td>${row.signingStatus || ''}</td>
                             <td>${row.op || ''}</td>
-                            <td>
+                            <td style="align-items: center;">
                                 <button onclick="editRow(${JSON.stringify(row).replace(/"/g, '&quot;')})">
                                     <img src="../images/edit_icon.png" width="25" heigth="35">
                                 </button>
@@ -199,6 +219,13 @@
                         `;
                         tableBody.appendChild(tr);
                     });
+            }
+            
+            async function loadTable(){
+                try{
+                    const res = await fetch(API_URL);
+                    const data = await res.json();
+                    table(data);
                 } catch (err) {
                     console.error('Failed to load table: ', err);
                 }
@@ -215,6 +242,7 @@
                 document.getElementById('editContact').value = row.contact;
                 document.getElementById('editSigningStatus').value = row.signingStatus;
                 document.getElementById('editDocumentType').value = row.documentType;
+                document.getElementById('editop').value = row.op;
             }
 
             async function deleteRow(id){
@@ -250,34 +278,7 @@
                         const res = await fetch(`${API_URL}/search/${encodeURIComponent(input)}`);
                         const data = await res.json();
                         if(data != ''){
-                            tableBody.innerHTML = '';
-                            data.forEach(row => {
-                                const tr = document.createElement('tr');
-                                tr.innerHTML = `
-                                    <td>${row.ID}</td>
-                                    <td>${row.registrationNumber}</td>
-                                    <td>${row.registrationDate || ''}</td>
-                                    <td>${row.name}</td>
-                                    <td>${row.studentGroup || ''}</td>
-                                    <td>${row.information || ''}</td>
-                                    <td>${row.contact || ''}</td>
-                                    <td>${row.documentType || ''}</td>
-                                    <td>${row.signingStatus || ''}</td>
-                                    <td>${row.op || ''}</td>
-                                    <td>
-                                        <button onclick="editRow(${JSON.stringify(row).replace(/"/g, '&quot;')})">
-                                            <img src="../images/edit_icon.png" width="25" heigth="35">
-                                        </button>
-                                        <button onclick="deleteRow(${row.ID})">
-                                            <img src="../images/delete_icon.png" width="25" height="25">
-                                        </button>
-                                        <button onclick="cloneRow(${row.ID})">
-                                            <img src="../images/duplicate.png" width="25" height="25">
-                                        </button>
-                                    </td>
-                                `;
-                                tableBody.appendChild(tr);
-                            });
+                            table(data);
                         }else{
                             alert('Нічого не знайдено!');
                         }
@@ -290,6 +291,25 @@
                 }
             }
 
+            async function performSearch(column, order = 'DESC'){
+                try{
+                    const res = await fetch(`${API_URL}/sort?by=${column}&order=${order}`);
+                    const data = await res.json();
+                    if(data != ''){
+                        table(data);
+                    }else{
+                        loadtable();
+                    }
+                }catch(err){
+                    console.error(err);
+                }
+            }
+
+            function sortBy(column) {
+                //sortOrder = (sortOrder === 'desc') ? 'asc' : 'desc'; // Toggle order
+                performSearch(column, sortOrder);
+                document.getElementById('filterFormDiv').style.display = 'none';
+            }
             //--Event listener for edit form--
             document.getElementById('editForm').addEventListener('submit', async e => {
                 e.preventDefault();
@@ -302,7 +322,8 @@
                     contact: document.getElementById('editContact').value,
                     studentGroup: document.getElementById('editGroup').value,
                     documentType: document.getElementById('editDocumentType').value,
-                    signingStatus: document.getElementById('editSigningStatus').value
+                    signingStatus: document.getElementById('editSigningStatus').value,
+                    op: document.getElementById('editop').value
                 }
 
                 try{
@@ -332,7 +353,8 @@
                     contact: document.getElementById('contact').value,
                     studentGroup: document.getElementById('group').value,
                     documentType: document.getElementById('documentType').value,
-                    signingStatus: document.getElementById('signingStatus').value
+                    signingStatus: document.getElementById('signingStatus').value,
+                    op: document.getElementById('op').value
                 }
 
                 try{
