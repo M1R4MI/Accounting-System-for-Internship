@@ -92,16 +92,16 @@ select {
   opacity: 1;
 }
 
-.search-container{
+.auxiliary-container{
   display: flex;
   justify-content: end;
-  width: 20rem;
+  width: 28rem;
   margin: 0 1rem auto 0;
   right:0px;
   padding: 0.5rem 0 0 0;
 }
 
-.search-container #searchbtn{
+.auxiliary-container #searchbtn{
   margin-left: 4px;
   height: 2rem;
   font-weight: bold;
@@ -114,10 +114,10 @@ select {
   cursor: pointer;
 }
 
-.search-container .filter-button{
+.auxiliary-container .filter-button{
   margin-right: 4px;
   width: 2.5rem;
-  height: 2rem;
+  height: 2.1rem;
   border: 1px solid #d1d5db;
   border-radius: 0.3rem;
   text-align: center;
@@ -131,10 +131,6 @@ select {
   height: 25px;
   border: 0;
   position: static;
-}
-
-.search-container #searchbtn:hover, .filter-button:hover, .filterBtn:hover{
-  opacity: 1;
 }
 
 .filterForm-popup{
@@ -160,6 +156,24 @@ select {
   align-items: center;
   cursor: pointer;
   opacity: 0.8;
+}
+
+.auxiliary-container #exportBtn{
+  height: 2rem;
+  width: 8rem;
+  right: 15px;
+  text-align: center;
+  margin-left: 4px;
+  border: 1px solid #d1d5db;
+  background-color: #d1d5db;
+  border-radius: 0.3rem;
+  cursor: pointer;
+  font-weight: bold;
+  opacity: 0.8;
+}
+
+.auxiliary-container #searchbtn:hover, .filter-button:hover, .filterBtn:hover, #exportBtn:hover{
+  opacity: 1;
 }
 
 footer{

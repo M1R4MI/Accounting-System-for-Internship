@@ -11,12 +11,15 @@
             <h1>Система обліку студентів для проходження виробничої практики</h1>
 
             <!-- Search field for dynamic searching in the table -->
-            <div class ="search-container">
+            <div class ="auxiliary-container">
                 <button id="filterToggle" class="filter-button" onclick="filterToggle()">
                     <img src="../images/filter.png" class="btnImg">
                 </button>
                 <input type="text" id="searchInput" placeholder="">
+                <!-- Search button -->
                 <button type="button" onclick="searchInTable()" id="searchbtn">Пошук</button>
+                <!-- Export button -->
+                <button type="button" id="exportBtn" onclick="exportTable('mainDataTable')">Експорт</button>
             </div>
 
             <div id="mainDataTable">
@@ -310,6 +313,35 @@
                 performSearch(column, sortOrder);
                 document.getElementById('filterFormDiv').style.display = 'none';
             }
+
+            //Export function with redirection to the server
+            async function exportTable(tableName){
+                try{
+                    const res = await fetch(`${API_URL}/export?table=${tableName}`, {
+                        method: 'GET'
+                    });
+
+                    if(!res.ok){
+                        throw new Error(`Server error: ${res.statusText}`);
+                    }
+
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${tableName}.xlsx`
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+
+                    URL.revokeObjectURL(url);
+                }catch(err){
+                    console.error('Download failed: ', err);
+                    alert('Failed to download the Excel file.');
+                }
+            }
+
             //--Event listener for edit form--
             document.getElementById('editForm').addEventListener('submit', async e => {
                 e.preventDefault();
