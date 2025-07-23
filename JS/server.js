@@ -6,6 +6,8 @@ const path = require('path');
 const { error } = require('console');
 const auxiliary = require('./functions.js');
 const dateFormat = require('dayjs');
+const ExcelJs = require('exceljs');
+const { write } = require('fs');
 
 const app = express();
 (async () => {
@@ -116,6 +118,41 @@ const app = express();
             }
         })
         
+        app.get('/table/export', async (req, res) =>{
+            const table = req.query.table;
+
+            if(!table){
+                return res.status(400).send('Table name is required');
+            }
+
+            try{
+                const [rows] = await db.query(`SELECT * FROM year2025`);
+
+                const workbook = new ExcelJs.Workbook();
+                const worksheet = workbook.addWorksheet(table);
+
+                if(rows.length > 0){
+                    //Add column header
+                    worksheet.columns = Object.keys(rows[0]).map(key =>({
+                        header: key,
+                        key: key,
+                        width: 20
+                    }));
+
+                    rows.forEach(row => worksheet.addRow(row));
+                }
+
+                res.setHeader('Content-Type', 'application/wnd.openxmlformats-officedocument.spreadsheetml.sheet');
+                res.setHeader('Content-Description', `attachment; filename=${table}.xlsx`);
+
+                await workbook.xlsx.write(res);
+                res.end();
+            }catch (err) {
+                console.error('Error exporting table to Excel: ', err);
+                res.status(500).send('Internal server error');
+            }
+        })
+
         //--HTTP clone row method--
         app.post('/table/clone/:id', async (req, res) => {
             const id = req.params.id;
