@@ -1,10 +1,11 @@
-body{
+body {
   background-color: #f3f4f6;
   min-height: 100vh;
   font-family: Arial, Helvetica, sans-serif;
 }
 
-h1, h2 {
+h1,
+h2 {
   text-align: center;
   font-weight: bold;
   margin-bottom: 1.5rem;
@@ -32,7 +33,7 @@ input {
   margin-bottom: 1rem;
 }
 
-label{
+label {
   margin: 1rem;
 }
 select {
@@ -43,8 +44,8 @@ select {
   margin-bottom: 1rem;
 }
 
-.open-button{
-  background-color:#a3a3aa;
+.open-button {
+  background-color: #a3a3aa;
   color: white;
   padding: 16px 20px;
   border: none;
@@ -56,7 +57,7 @@ select {
   width: 280px;
 }
 
-.form-popup{
+.form-popup {
   display: none;
   position: fixed;
   bottom: 2rem;
@@ -65,43 +66,43 @@ select {
   z-index: 9;
 }
 
-.Form-container{
+.Form-container {
   max-width: 300px;
   padding: 10px;
   background-color: white;
 }
 
-
 .Form-container .btn {
-  background-color: #04AA6D;
+  background-color: #04aa6d;
   color: white;
   padding: 16px 20px;
   border: none;
   cursor: pointer;
   width: 100%;
   margin-top: 10px;
-  margin-bottom:10px;
+  margin-bottom: 10px;
   opacity: 0.8;
 }
 
-.Form-container .cancel{
+.Form-container .cancel {
   background-color: red;
 }
 
-.Form-container .btn:hover, .open-button:hover{
+.Form-container .btn:hover,
+.open-button:hover {
   opacity: 1;
 }
 
-.auxiliary-container{
+.auxiliary-container {
   display: flex;
   justify-content: end;
   width: 28rem;
   margin: 0 1rem auto 0;
-  right:0px;
+  right: 0px;
   padding: 0.5rem 0 0 0;
 }
 
-.auxiliary-container #searchbtn{
+.auxiliary-container #searchbtn {
   margin-left: 4px;
   height: 2rem;
   font-weight: bold;
@@ -114,7 +115,7 @@ select {
   cursor: pointer;
 }
 
-.auxiliary-container .filter-button{
+.auxiliary-container .filter-button {
   margin-right: 4px;
   width: 2.5rem;
   height: 2.1rem;
@@ -126,14 +127,14 @@ select {
   opacity: 0.8;
 }
 
-.btnImg{
+.btnImg {
   width: 25px;
   height: 25px;
   border: 0;
   position: static;
 }
 
-.filterForm-popup{
+.filterForm-popup {
   display: none;
   position: fixed;
   width: 250px;
@@ -145,7 +146,7 @@ select {
   z-index: 9;
 }
 
-.filterBtn{
+.filterBtn {
   width: 100%;
   height: 30px;
   border: 1px solid #d1d5db;
@@ -158,7 +159,7 @@ select {
   opacity: 0.8;
 }
 
-.auxiliary-container #exportBtn{
+.auxiliary-container #exportBtn {
   height: 2rem;
   width: 8rem;
   right: 15px;
@@ -172,11 +173,14 @@ select {
   opacity: 0.8;
 }
 
-.auxiliary-container #searchbtn:hover, .filter-button:hover, .filterBtn:hover, #exportBtn:hover{
+.auxiliary-container #searchbtn:hover,
+.filter-button:hover,
+.filterBtn:hover,
+#exportBtn:hover {
   opacity: 1;
 }
 
-footer{
+footer {
   text-align: center;
   position: fixed;
   width: 100%;
@@ -194,7 +198,8 @@ table {
   margin-top: 1rem;
 }
 
-th, td {
+th,
+td {
   border: 1px solid #d1d5db;
   padding: 0.5rem 1rem;
   text-align: left;

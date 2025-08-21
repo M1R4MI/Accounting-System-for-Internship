@@ -1,13 +1,151 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewpoint" content="width=device-width, initial-scale=1.0" />
-        <title>Система обліку студентів для проходження виробничої практики</title>
-        <link rel="stylesheet" type="text/css" href="../css/style.css">
-    </head>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Система обліку студентів</title>
 
-    <body>
-        
-    </body>
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+
+    <!-- Іконки Bootstrap -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="../css/index.css" />
+  </head>
+  <body>
+    <!-- Шапка сайту -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+      <div class="container">
+        <a class="navbar-brand fw-bold" href="#">Система обліку студентів</a>
+      </div>
+    </nav>
+
+    <!-- Основний контейнер -->
+    <div class="container py-4">
+      <!-- Заголовок + кнопка додати -->
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h3">Список таблиць</h1>
+        <div>
+          <button
+            class="btn btn-primary btn-add"
+            data-bs-toggle="modal"
+            data-bs-target="#tableModal"
+          >
+            <i class="bi bi-plus-lg"></i> Додати таблицю
+          </button>
+          <button class="btn btn-secondary">Імпорт таблиці</button>
+        </div>
+      </div>
+
+      <!-- Таблиця -->
+      <div class="table-container">
+        <table class="table table-hover align-middle">
+          <thead>
+            <tr>
+              <th>Назва таблиці</th>
+              <th>Факультет</th>
+              <th>Спеціальність</th>
+              <th>Дата створення</th>
+              <th>Дата зміни</th>
+              <th>Дії</th>
+            </tr>
+          </thead>
+
+          <tbody id="tables-list"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Пагінація -->
+    <nav>
+      <ul class="pagination justify-content-center">
+        <li class="page-item disabled">
+          <a class="page-link">Попередня</a>
+        </li>
+        <li class="page-item active"><a class="page-link" href="#">1</a></li>
+        <li class="page-item"><a class="page-link" href="#">2</a></li>
+        <li class="page-item"><a class="page-link" href="#">3</a></li>
+        <li class="page-item">
+          <a class="page-link" href="#">Наступна</a>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- Модальне вікно -->
+    <div
+      class="modal fade"
+      id="tableModal"
+      tabindex="-1"
+      aria-labelledby="tableModalLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <form>
+            <div class="modal-header">
+              <h5 class="modal-title" id="tableModalLabel">
+                Додати / Редагувати таблицю
+              </h5>
+              <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"
+              ></button>
+            </div>
+            <div class="modal-body">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">Назва таблиці</label>
+                  <input type="text" class="form-control" required />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Факультет</label>
+                  <input type="text" class="form-control" required />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Код спеціальності</label>
+                  <input type="number" class="form-control" required />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Назва кафедри</label>
+                  <input type="text" class="form-control" required />
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Кількість груп</label>
+                  <input type="number" class="form-control" required />
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Рік вступу</label>
+                  <input type="number" class="form-control" required />
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                data-bs-dismiss="modal"
+              >
+                Скасувати
+              </button>
+              <button type="submit" class="btn btn-primary">Зберегти</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- JS для обробки форми -->
+    <script src="../../JS/index.js"></script>
+  </body>
 </html>

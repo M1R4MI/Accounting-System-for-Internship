@@ -20,16 +20,17 @@ const app = express();
         app.use(express.static('../public'));
         app.use(express.static('../public/html'));
         app.use('/css', express.static('../public/css'));
+        app.use('/JS', express.static(__dirname));
         
         app.get('/', (req, res) =>{
-            res.sendFile(path.join('public', 'html', 'index.html'));
+            res.sendFile(path.join(__dirname, "../public", "html", 'index.html'));
         });
         
         app.post('/', async (req, res) =>{
             console.log(req.body);
             try{
                 const [dbRows] = await db.query(`
-                CREATE TABLE IF NOT EXISTS year2025(
+                CREATE TABLE IF NOT EXISTS ?(
                     ID INT auto_increment primary key,
                     registrationNumber varchar(30),
                     registrationDate DATE,
@@ -40,13 +41,13 @@ const app = express();
                     documentType varchar(30),
                     signingStatus varchar(30),
                     op varchar(30)
-                );`);
+                );`, [tableName]);
             } catch(err) {
                 res.status(500).json(err);
             }
         });
         
-        app.get('/table', async (_, res) => {
+        app.get('/table', async (req, res) => {
             try{
                 const [rows] = await db.query('SELECT * FROM year2025');
                 const formattedRows = rows.map(row => ({

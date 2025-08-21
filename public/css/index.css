@@ -1,0 +1,14 @@
+body {
+  background-color: #f5f7fa;
+  font-family: "Segoe UI", sans-serif;
+}
+.table th {
+  background-color: #003366;
+  color: white;
+}
+.btn-primary {
+  background-color: #0055aa;
+}
+.btn-primary:hover {
+  background-color: #004080;
+}
