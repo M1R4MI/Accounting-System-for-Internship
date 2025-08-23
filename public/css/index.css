@@ -12,3 +12,7 @@ body {
 .btn-primary:hover {
   background-color: #004080;
 }
+
+.file-upload {
+  display: none;
+}

@@ -40,7 +40,14 @@
           >
             <i class="bi bi-plus-lg"></i> Додати таблицю
           </button>
-          <button class="btn btn-secondary">Імпорт таблиці</button>
+
+          <input
+            type="file"
+            id="container__file-input"
+            class="file-upload"
+            accept=".csv,.xlsx,.xls"
+          />
+          <button class="btn btn-secondary" id="container__file-import">Імпорт таблиці</button>
         </div>
       </div>
 
@@ -51,7 +58,7 @@
             <tr>
               <th>Назва таблиці</th>
               <th>Факультет</th>
-              <th>Спеціальність</th>
+              <th>Код Спеціальності</th>
               <th>Дата створення</th>
               <th>Дата зміни</th>
               <th>Дії</th>
@@ -102,28 +109,74 @@
             <div class="modal-body">
               <div class="row g-3">
                 <div class="col-md-6">
-                  <label class="form-label">Назва таблиці</label>
-                  <input type="text" class="form-control" required />
+                  <label class="form-label" for="form__table-name"
+                    >Назва таблиці</label
+                  >
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="form__table-name"
+                    required
+                  />
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label">Факультет</label>
-                  <input type="text" class="form-control" required />
+                  <label class="form-label" for="form__faculty-name"
+                    >Факультет</label
+                  >
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="form__faculty-name"
+                    required
+                  />
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label">Код спеціальності</label>
-                  <input type="number" class="form-control" required />
+                  <label class="form-label" for="form__specialty-code"
+                    >Код спеціальності</label
+                  >
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="form__specialty-code"
+                    required
+                  />
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label">Назва кафедри</label>
-                  <input type="text" class="form-control" required />
+                  <label class="form-label" for="form__department-name"
+                    >Назва кафедри</label
+                  >
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="form__department-name"
+                    required
+                  />
                 </div>
                 <div class="col-md-4">
-                  <label class="form-label">Кількість груп</label>
-                  <input type="number" class="form-control" required />
+                  <label class="form-label" for="form__group-count"
+                    >Кількість груп</label
+                  >
+                  <input
+                    type="number"
+                    class="form-control"
+                    id="form__group-count"
+                    min="1"
+                    max="15"
+                    required
+                  />
                 </div>
                 <div class="col-md-4">
-                  <label class="form-label">Рік вступу</label>
-                  <input type="number" class="form-control" required />
+                  <label class="form-label" for="form__entry-year"
+                    >Рік вступу</label
+                  >
+                  <input
+                    type="number"
+                    class="form-control"
+                    id="form__entry-year"
+                    min="2000"
+                    max="2200"
+                    required
+                  />
                 </div>
               </div>
             </div>
