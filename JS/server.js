@@ -41,7 +41,7 @@ const upload = multer({ dest: "uploads/" });
             );`
     );
 
-    app.get("api/tables", async (req, res) => {
+    app.get("/api/meta_tables", async (req, res) => {
       try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
@@ -99,7 +99,7 @@ const upload = multer({ dest: "uploads/" });
           groups_count,
           entry_year,
           dateTime,
-          dateTime
+          dateTime,
         ]);
 
         res.json({ message: `Таблиця ${tableName} створена` });
@@ -114,7 +114,7 @@ const upload = multer({ dest: "uploads/" });
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
 
-        const result = await getDataWithPagination(table, page.limit);
+        const result = await getDataWithPagination(table, page, limit);
         res.json(result);
       } catch (err) {
         console.error(err);
@@ -434,28 +434,38 @@ const upload = multer({ dest: "uploads/" });
     async function getDataWithPagination(tableName, page = 1, limit = 10) {
       const offset = (page - 1) * limit;
 
-      if (tableName === "tables") {
-        const [rows] = await db.query(
-          `SELECT name, faculty, speciality_code, created_at, updated_at FROM ?? LIMIT ? OFFSET ?`,
-          [tableName, limit, offset]
-        );
+      // basic whitelist to avoid SQL injection for identifiers
+      if (!/^[a-zA-Z0-9_]+$/.test(tableName)) {
+        throw new Error("Invalid table name");
       }
 
-      const [rows] = await db.query(`SELECT * FROM ?? LIMIT ? OFFSET ?`, [
-        tableName,
-        limit,
-        offset,
-      ]);
+      const tableId = `\`${tableName}\``;
+      let rows = [];
+      if (tableName === "meta_tables") {
+        const [r] = await db.query(
+          `SELECT tableName AS name, faculty, speciality_code, created_at, updated_at FROM ${tableId} LIMIT ? OFFSET ?`,
+          [limit, offset]
+        );
+        rows = r;
+      } else {
+        const [r] = await db.query(
+          `SELECT * FROM ${tableId} LIMIT ? OFFSET ?`,
+          [limit, offset]
+        );
+        rows = r;
+      }
 
-      const [countRows] = await db.query(`SELECT COUNT(*) AS TOTAL FROM ?`, [
-        tableName,
-      ]);
+      const [countRows] = await db.query(
+        `SELECT COUNT(*) AS total FROM ${tableId}`
+      );
+
+      const total = (countRows && countRows[0] && countRows[0].total) || 0;
 
       return {
         data: rows,
-        total: countRows[0].total,
+        total,
         page,
-        totalPages: Math.ceil(countRows[0].total / limit),
+        totalPages: Math.ceil(total / limit),
       };
     }
 

@@ -10,30 +10,30 @@ function table(data) {
   data.forEach((row) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-                            <td>${row.ID}</td>
-                            <td>${row.registrationNumber}</td>
-                            <td>${row.registrationDate || ""}</td>
-                            <td>${row.name}</td>
-                            <td>${row.studentGroup || ""}</td>
-                            <td>${row.information || ""}</td>
-                            <td>${row.contact || ""}</td>
-                            <td>${row.documentType || ""}</td>
-                            <td>${row.signingStatus || ""}</td>
-                            <td>${row.op || ""}</td>
-                            <td style="align-items: center;">
-                                <button onclick="editRow(${JSON.stringify(
-                                  row
-                                ).replace(/"/g, "&quot;")})">
-                                    <img src="../images/edit_icon.png" width="25" heigth="35">
-                                </button>
-                                <button onclick="deleteRow(${row.ID})">
-                                    <img src="../images/delete_icon.png" width="25" height="25">
-                                </button>
-                                <button onclick="cloneRow(${row.ID})">
-                                    <img src="../images/duplicate.png" width="25" height="25">
-                                </button>
-                            </td>
-                        `;
+            <td>${row.ID}</td>
+            <td>${row.registrationNumber}</td>
+            <td>${row.registrationDate || ""}</td>
+            <td>${row.name}</td>
+            <td>${row.studentGroup || ""}</td>
+            <td>${row.information || ""}</td>
+            <td>${row.contact || ""}</td>
+            <td>${row.documentType || ""}</td>
+            <td>${row.signingStatus || ""}</td>
+            <td>${row.op || ""}</td>
+            <td style="align-items: center;">
+                <button onclick="editRow(${JSON.stringify(
+                  row
+                ).replace(/"/g, "&quot;")})">
+                    <img src="../images/edit_icon.png" width="25" heigth="35">
+                </button>
+                <button onclick="deleteRow(${row.ID})">
+                    <img src="../images/delete_icon.png" width="25" height="25">
+                </button>
+                <button onclick="cloneRow(${row.ID})">
+                    <img src="../images/duplicate.png" width="25" height="25">
+                </button>
+            </td>
+        `;
     tableBody.appendChild(tr);
   });
 }

@@ -1,8 +1,7 @@
-const API_URL = "localhost:3308";
-
 // Кнопка імпорту таблиці в форматі .xlsx, .csv, .xls
 const fileInput = document.getElementById("container__file-input");
 const importButton = document.getElementById("container__file-import");
+const tableBody = document.querySelector("#meta__table tbody");
 
 // відкриваємо системну форму вибору файлу з системи
 importButton.addEventListener("click", () => {
@@ -28,36 +27,43 @@ fileInput.addEventListener("change", async (event) => {
     }
   }
 
-  if (fileInput.isDefaultNamespace.length > 0) {
+  if (fileInput.files && fileInput.files.length > 0) {
     window.location.reload();
   }
 });
 
 // Завантаження таблиць з бекенду
 async function loadTables(page, limit = 10) {
-  const res = await fetch(`/api/tables?page=${page}&limit=${limit}`);
-  const data = await res.json();
+  const res = await fetch(`/api/meta_tables?page=${page}&limit=${limit}`);
+  if (!res.ok) {
+    console.error("Failed to load meta_tables:", res.status, await res.text());
+    return;
+  }
 
-  const tbody = document.querySelector("table tbody");
-  tbody.innerHTML = "";
+  const payload = await res.json();
+  // payload may be { data: [...], totalPages, page, total }
+  const rows = Array.isArray(payload) ? payload : payload.data || [];
+  const totalPages = payload.totalPages || 1;
 
-  data.rows.forEach((row) => {
+  tableBody.innerHTML = "";
+  rows.forEach((row) => {
+    const id = row.id ?? row.tableName ?? row.name ?? "";
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${row.name}</td>
-      <td>${row.faculty}</td>
-      <td>${row.speciality_code}</td>
-      <td>${row.created_at}</td>
-      <td>${row.updated_at}</td>
-      <td>
-        <button class="btn btn-sm btn-warning" onclick="editTable(${row.id})"><img src="../public/images/edit-icon.png" /></button>
-        <button class="btn btn-sm btn-danger" onclick="deleteTable(${row.id})"><img src="../public/images/delete-icon.png" /></button>
-      </td>
-    `;
-    tbody.appendChild(tr);
+        <td>${row.name ?? ""}</td>
+        <td>${row.faculty ?? ""}</td>
+        <td>${row.speciality_code ?? ""}</td>
+        <td>${row.created_at ?? ""}</td>
+        <td>${row.updated_at ?? ""}</td>
+        <td>
+          <button class="btn btn-sm btn-outline-warning" onclick="editTable('${id}')"><img src="../images/edit-icon.png" width="25" heigth="35" style= "padding: 1px;" /></button>
+          <button class="btn btn-sm btn-outline-danger" onclick="deleteTable('${id}')"><img src="../images/delete-icon.png" width="25" heigth="35"style= "padding: 1px;" /></button>
+        </td>
+      `;
+    tableBody.appendChild(tr);
   });
 
-  renderPagination(data.totalPages, page);
+  renderPagination(totalPages, page);
 }
 
 // Створення пагінації
@@ -126,9 +132,14 @@ if (tableForm) {
     const speciality_code = document
       .getElementById("form__specialty-code")
       .value.trim();
-    const department = document.getElementById("form__department-name").value.trim();
-    const groups_count = parseInt(document.getElementById("form__group-count").value, 10) || 0;
-    const entry_year = parseInt(document.getElementById("form__entry-year").value, 10) || new Date().getFullYear();
+    const department = document
+      .getElementById("form__department-name")
+      .value.trim();
+    const groups_count =
+      parseInt(document.getElementById("form__group-count").value, 10) || 0;
+    const entry_year =
+      parseInt(document.getElementById("form__entry-year").value, 10) ||
+      new Date().getFullYear();
 
     if (!tableName) {
       alert("Введіть назву таблиці");
@@ -136,29 +147,36 @@ if (tableForm) {
     }
 
     try {
-      const res = await fetch('/create-table', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tableName, faculty, speciality_code, department, groups_count, entry_year })
+      const res = await fetch("/create-table", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tableName,
+          faculty,
+          speciality_code,
+          department,
+          groups_count,
+          entry_year,
+        }),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error || data.message || 'Помилка при створенні таблиці');
+        alert(data.error || data.message || "Помилка при створенні таблиці");
         return;
       }
 
       // Закрити модал і перезавантажити список таблиць
-      const modalEl = document.querySelector('#tableModal');
+      const modalEl = document.querySelector("#tableModal");
       const bsModal = bootstrap.Modal.getInstance(modalEl);
       if (bsModal) bsModal.hide();
 
-      const savePage = localStorage.getItem('currentPage');
+      const savePage = localStorage.getItem("currentPage");
       loadTables(savePage ? parseInt(savePage) : 1, 10);
-      alert(data.message || 'Таблиця створена');
+      alert(data.message || "Таблиця створена");
     } catch (err) {
       console.error(err);
-      alert('Помилка при створенні таблиці');
+      alert("Помилка при створенні таблиці");
     }
   });
 }
