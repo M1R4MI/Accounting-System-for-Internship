@@ -6,23 +6,16 @@ async function createDatabaseIfNotExists(connectionConfig) {
 
   let connection;
   try {
-    // Connect to the MySQL server (without specifying a database initially)
-    connection = await mysql.createConnection({
-      host,
-      user,
-      password,
-      waitForConnections,
-    });
+  connection = await mysql.createConnection({ host, user, password });
 
-    // Execute the CREATE DATABASE IF NOT EXISTS query
-    await connection.query(`CREATE DATABASE IF NOT EXISTS \`${database}\`;`);
-    console.log(`Database '${database}' ensured to exist.`);
+  await connection.query(`CREATE DATABASE IF NOT EXISTS \`${database}\`;`);
+  console.log(`Database '${database}' ensured to exist.`);
   } catch (error) {
     console.error("Error creating database:", error);
     throw error; // Re-throw the error for external handling
   } finally {
     if (connection) {
-      await connection.end(); // Close the connection
+      await connection.end();
     }
   }
 }
@@ -35,7 +28,9 @@ async function getDbConnection() {
     database: "AccountingSystem",
     waitForConnections: true,
   };
-  return createDatabaseIfNotExists(config);
+  await createDatabaseIfNotExists(config);
+  const pool = mysql.createPool(config);
+  return pool;
 }
 
 module.exports = getDbConnection;
