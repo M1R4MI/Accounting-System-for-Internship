@@ -7,6 +7,7 @@ const auxiliary = require("./functions.js");
 const dateFormat = require("dayjs");
 const ExcelJs = require("exceljs");
 const multer = require("multer");
+const dateTime = auxiliary.getDateTime();
 
 const app = express();
 const upload = multer({ dest: "uploads/" });
@@ -14,6 +15,10 @@ const upload = multer({ dest: "uploads/" });
   try {
     const db = await getDbConnection();
     console.log("Connected to db!");
+    const PORT = process.env.PORT || 3308;
+    app.listen(PORT, () => {
+      console.log(`Server running on port: ${PORT}`);
+    });
 
     app.use(cors());
     app.use(bodyParser.json());
@@ -64,8 +69,6 @@ const upload = multer({ dest: "uploads/" });
           groups_count,
           entry_year,
         } = req.body;
-
-        const dateTime = auxiliary.getDateTime();
 
         if (!tableName || !/^[a-zA-Z0-9_]+$/.test(tableName)) {
           return res.status(400).json({ error: "Неправильна назва таблиці" });
@@ -164,11 +167,15 @@ const upload = multer({ dest: "uploads/" });
         //Create table if not exists
         let createQuery = `CREATE TABLE IF NOT EXISTS \`${tableName}\` (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        ${keys.map((k) => `\`${k}\` ${columnTypes[k]}`).join(", ")}
-        )`;
+        ${keys.map((k) => `\`${k}\` ${columnTypes[k]}`).join(", ")});`;
 
         await db.query(createQuery);
 
+        const insertMetaSql = `
+          INSERT INTO meta_tables (tableName, created_at, updated_at)
+          VALUES (?, ?, ?)`;
+
+        await db.query(insertMetaSql, [tableName, dateTime, dateTime]);
         // Add unique key for all the columns
         let uniqueKey = `ALTER TABLE \`${tableName}\` ADD UNIQUE KEY unique_row (${keys
           .map((c) => `\`${c}\``)
@@ -424,7 +431,7 @@ const upload = multer({ dest: "uploads/" });
     //--HTTP delete row in table method--
     app.delete("/table/:id", async (req, res) => {
       try {
-        db.query("DELETE FROM year2025 WHERE id = ?", [req.params.id]);
+        db.query(`DELETE FROM ${tableName} WHERE id = ?`, [req.params.id]);
         res.sendStatus(200);
       } catch (err) {
         res.status(500).json(err);
@@ -468,11 +475,6 @@ const upload = multer({ dest: "uploads/" });
         totalPages: Math.ceil(total / limit),
       };
     }
-
-    const PORT = process.env.PORT || 3308;
-    app.listen(PORT, () => {
-      console.log(`Server running on port: ${PORT}`);
-    });
   } catch (err) {
     console.error("Failed to start server: ", err);
   }
