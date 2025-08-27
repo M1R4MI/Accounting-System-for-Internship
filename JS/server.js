@@ -27,6 +27,56 @@ const upload = multer({ dest: "uploads/" });
     app.use("/css", express.static("../public/css"));
     app.use("/JS", express.static(__dirname));
 
+    // Endpoint: отримати метадані таблиці по id
+    app.get("/api/meta_tables/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const [rows] = await db.query(
+          "SELECT * FROM meta_tables WHERE id = ?",
+          [id]
+        );
+        if (!rows.length)
+          return res.status(404).json({ error: "Таблицю не знайдено" });
+        res.json(rows[0]);
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+
+    // Endpoint: оновити метадані таблиці по id
+    app.put("/api/meta_tables/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const {
+          tableName,
+          faculty,
+          speciality_code,
+          department,
+          groups_count,
+          entry_year,
+        } = req.body;
+        if (!tableName)
+          return res.status(400).json({ error: "Введіть назву таблиці" });
+        const [result] = await db.query(
+          `UPDATE meta_tables SET tableName=?, faculty=?, speciality_code=?, department=?, groups_count=?, entry_year=?, updated_at=? WHERE id=?`,
+          [
+            tableName,
+            faculty,
+            speciality_code,
+            department,
+            groups_count,
+            entry_year,
+            dateTime,
+            id,
+          ]
+        );
+        if (result.affectedRows === 0)
+          return res.status(404).json({ error: "Таблицю не знайдено" });
+        res.json({ message: "Дані таблиці оновлено" });
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
+    });
     app.get("/", (req, res) => {
       res.sendFile(path.join(__dirname, "../public", "html", "index.html"));
     });
@@ -438,6 +488,20 @@ const upload = multer({ dest: "uploads/" });
       }
     });
 
+    //HTTP query to delete element from meta_tables table
+    app.delete("/api/meta_tables/:id", async (req, res) => {
+      const tableName = "meta_tables";
+      try {
+        // Ім'я таблиці підставляємо напряму, id — через плейсхолдер
+        await db.query(`DELETE FROM ${tableName} WHERE id = ?`, [
+          req.params.id,
+        ]);
+        res.sendStatus(200);
+      } catch (err) {
+        res.status(500).json(err);
+      }
+    });
+
     async function getDataWithPagination(tableName, page = 1, limit = 10) {
       const offset = (page - 1) * limit;
 
@@ -450,7 +514,7 @@ const upload = multer({ dest: "uploads/" });
       let rows = [];
       if (tableName === "meta_tables") {
         const [r] = await db.query(
-          `SELECT tableName AS name, faculty, speciality_code, created_at, updated_at FROM ${tableId} LIMIT ? OFFSET ?`,
+          `SELECT id, tableName AS name, faculty, speciality_code, created_at, updated_at FROM ${tableId} LIMIT ? OFFSET ?`,
           [limit, offset]
         );
         rows = r;

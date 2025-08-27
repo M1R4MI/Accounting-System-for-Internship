@@ -50,6 +50,7 @@ async function loadTables(page, limit = 10) {
     const id = row.id ?? row.tableName ?? row.name ?? "";
     const tr = document.createElement("tr");
     tr.innerHTML = `
+        <td>${row.id ?? ""}</td>
         <td>${row.name ?? ""}</td>
         <td>${row.faculty ?? ""}</td>
         <td>${row.speciality_code ?? ""}</td>
@@ -82,17 +83,27 @@ function renderPagination(totalPages, currentPage) {
   localStorage.setItem("currentPage", currentPage);
 }
 
-// Редагування таблиці
+// Редагування метаданих таблиці
 async function editTable(id) {
-  const res = await fetch(`/api/tables/${id}`);
+  // Отримати метадані таблиці
+  const res = await fetch(`/api/meta_tables/${id}`);
+  if (!res.ok) {
+    alert("Не вдалося завантажити дані таблиці");
+    return;
+  }
   const row = await res.json();
 
   const form = document.querySelector("#tableModal form");
   form.dataset.editId = id;
 
-  form.querySelectorAll("input").forEach((input) => {
-    input.value = row[input.name] || "";
-  });
+  // Заповнити поля форми
+  document.getElementById("form__table-name").value = row.tableName || "";
+  document.getElementById("form__faculty-name").value = row.faculty || "";
+  document.getElementById("form__specialty-code").value =
+    row.speciality_code || "";
+  document.getElementById("form__department-name").value = row.department || "";
+  document.getElementById("form__group-count").value = row.groups_count || "";
+  document.getElementById("form__entry-year").value = row.entry_year || "";
 
   new bootstrap.Modal(document.querySelector("#tableModal")).show();
 }
@@ -101,9 +112,9 @@ async function editTable(id) {
 async function deleteTable(id) {
   if (!confirm("Ви впевнені, що хочете видалити цю таблицю?")) return;
 
-  const res = await fetch(`/api/tables/${id}`, { method: "DELETE" });
+  const res = await fetch(`/api/meta_tables/${id}`, { method: "DELETE" });
   if (res.ok) {
-    loadTables(1);
+    await loadTables(1);
   } else {
     alert("Помилка видалення!");
   }
@@ -146,9 +157,14 @@ if (tableForm) {
       return;
     }
 
+    // Якщо є editId - редагування, інакше створення
+    const editId = tableForm.dataset.editId;
+    const url = editId ? `/api/meta_tables/${editId}` : "/create-table";
+    const method = editId ? "PUT" : "POST";
+
     try {
-      const res = await fetch("/create-table", {
-        method: "POST",
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tableName,
@@ -159,27 +175,21 @@ if (tableForm) {
           entry_year,
         }),
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        alert(data.error || data.message || "Помилка при створенні таблиці");
-        return;
+      if (res.ok) {
+        location.reload();
+      } else {
+        const err = await res.json();
+        alert(
+          err.error ||
+            (editId ? "Помилка оновлення таблиці" : "Помилка створення таблиці")
+        );
       }
-
-      // Закрити модал і перезавантажити список таблиць
-      const modalEl = document.querySelector("#tableModal");
-      const bsModal = bootstrap.Modal.getInstance(modalEl);
-      if (bsModal) bsModal.hide();
-
-      const savePage = localStorage.getItem("currentPage");
-      loadTables(savePage ? parseInt(savePage) : 1, 10);
-      alert(data.message || "Таблиця створена");
     } catch (err) {
-      console.error(err);
-      alert("Помилка при створенні таблиці");
+      alert("Помилка з'єднання з сервером");
     }
   });
 }
+// ...existing code...
 
 // load page from local storage after page reload
 window.addEventListener("load", () => {
