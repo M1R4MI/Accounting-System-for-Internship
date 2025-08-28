@@ -26,10 +26,10 @@ async function generateRegistrationNumber(departmentID, connection) {
   return newRegistrationNumber;
 }
 
-async function searchInTable(input, connection) {
+async function searchInTable(table,input, connection) {
   try {
     const [result] = await connection.query(
-      `SELECT * FROM year2025
+      `SELECT * FROM ${table}
              WHERE name LIKE ? OR registrationNumber LIKE ?`,
       [`%${input}%`, `%${input}%`]
     );

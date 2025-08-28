@@ -61,6 +61,18 @@ async function loadTables(page, limit = 10) {
           <button class="btn btn-sm btn-outline-danger" onclick="deleteTable('${id}')"><img src="../images/delete-icon.png" width="25" heigth="35"style= "padding: 1px;" /></button>
         </td>
       `;
+    // Додаємо стилі курсора та обробник кліку
+    tr.style.cursor = "pointer";
+    tr.addEventListener("click", (e) => {
+      // Не реагувати, якщо клік по кнопці редагування/видалення
+      if (
+        e.target.closest("button") ||
+        e.target.tagName === "BUTTON" ||
+        e.target.closest("img")
+      )
+        return;
+      openTable(row.tableName || row.name || row.id);
+    });
     tableBody.appendChild(tr);
   });
 
@@ -189,7 +201,18 @@ if (tableForm) {
     }
   });
 }
-// ...existing code...
+
+async function openTable(tableName) {
+  if (!tableName) return;
+  // Наприклад, перехід на сторінку перегляду таблиці:
+  try {
+    window.location.href = `/table?tableName=${encodeURIComponent(tableName)}`;
+    const res = await fetch(`/api/table?tableName=${tableName}`);
+    
+  } catch (error) {
+    console.error(error);
+  }
+}
 
 // load page from local storage after page reload
 window.addEventListener("load", () => {

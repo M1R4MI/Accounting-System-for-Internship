@@ -57,6 +57,30 @@ const upload = multer({ dest: "uploads/" });
         } = req.body;
         if (!tableName)
           return res.status(400).json({ error: "Введіть назву таблиці" });
+
+        // Дізнаємось стару назву таблиці
+        const [oldRows] = await db.query(
+          "SELECT tableName FROM meta_tables WHERE id = ?",
+          [id]
+        );
+        if (!oldRows.length)
+          return res.status(404).json({ error: "Таблицю не знайдено" });
+        const oldTableName = oldRows[0].tableName;
+
+        await db.query(
+          `ALTER TABLE \`${oldTableName}\` RENAME TO \`${tableName}\``
+        );
+        if (oldTableName !== tableName) {
+          if (!/^[a-zA-Z0-9_]+$/.test(tableName)) {
+            return res
+              .status(400)
+              .json({ error: "Неправильна нова назва таблиці" });
+          }
+          await db.query(
+            `ALTER TABLE \`${oldTableName}\` RENAME TO \`${tableName}\``
+          );
+        }
+
         const [result] = await db.query(
           `UPDATE meta_tables SET tableName=?, faculty=?, speciality_code=?, department=?, groups_count=?, entry_year=?, updated_at=? WHERE id=?`,
           [
@@ -79,6 +103,11 @@ const upload = multer({ dest: "uploads/" });
     });
     app.get("/", (req, res) => {
       res.sendFile(path.join(__dirname, "../public", "html", "index.html"));
+    });
+
+    // Віддавати HTML сторінку таблиці за /table
+    app.get("/table", (req, res) => {
+      res.sendFile(path.join(__dirname, "../public", "html", "table.html"));
     });
 
     const [dbRows] = await db.query(
@@ -125,18 +154,18 @@ const upload = multer({ dest: "uploads/" });
         }
 
         const createTableSql = `
-          CREATE TABLE IF NOT EXISTS \`${tableName}\`(
-              ID INT auto_increment primary key,
-              registrationNumber varchar(30),
-              name varchar(255),
-              studentGroup varchar(30),
-              registrationDate DATE,
-              information varchar(500),
-              contact varchar(255),
-              documentType varchar(30),
-              signingStatus varchar(30),
-              op varchar(30)
-          );
+      CREATE TABLE IF NOT EXISTS \`${tableName}\`(
+        ID INT auto_increment primary key,
+        RegistrationNumber varchar(30),
+        StudentName varchar(255),
+        \`Student Group\` varchar(30),
+        \`Registration Date\` DATE,
+        Information varchar(500),
+        Contact varchar(255),
+        DocumentType varchar(30),
+        SigningStatus varchar(30),
+        OccupationalSafety varchar(30)
+      );
         `;
         await db.query(createTableSql);
 
@@ -161,14 +190,42 @@ const upload = multer({ dest: "uploads/" });
       }
     });
 
-    app.get("api/:table", async (req, res) => {
+    // Отримати всі рядки таблиці
+    app.get("/api/table/:tableName", async (req, res) => {
       try {
-        const { table } = req.params;
+        const tableName = req.params.tableName;
+        if (!tableName || !/^[a-zA-Z0-9_]+$/.test(tableName)) {
+          return res.status(400).json({ error: "Неправильна назва таблиці" });
+        }
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
-
-        const result = await getDataWithPagination(table, page, limit);
-        res.json(result);
+        const limit = parseInt(req.query.limit) || 1000;
+        const result = await getDataWithPagination(tableName, page, limit);
+        // Якщо таблиця стандартна (має всі стандартні поля) — форматувати registrationDate
+        const standardKeys = [
+          "ID",
+          "RegistrationNumber",
+          "StudentName",
+          "Student Group",
+          "Registration Date",
+          "Information",
+          "Contact",
+          "DocumentType",
+          "SigningStatus",
+          "OccupationalSafety",
+        ];
+        const isStandard =
+          result.data.length > 0 &&
+          standardKeys.every((k) => Object.keys(result.data[0]).includes(k)) &&
+          Object.keys(result.data[0]).length === standardKeys.length;
+        if (isStandard) {
+          result.data = result.data.map((row) => ({
+            ...row,
+            "Registration Date": row["Registration Date"]
+              ? dateFormat(row["Registration Date"]).format("DD-MM-YYYY")
+              : null,
+          }));
+        }
+        res.json(result.data);
       } catch (err) {
         console.error(err);
         res.status(500).json({ error: "Помилка при завантаженні даних" });
@@ -215,9 +272,9 @@ const upload = multer({ dest: "uploads/" });
         }
 
         //Create table if not exists
-        let createQuery = `CREATE TABLE IF NOT EXISTS \`${tableName}\` (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        ${keys.map((k) => `\`${k}\` ${columnTypes[k]}`).join(", ")});`;
+  let createQuery = `CREATE TABLE IF NOT EXISTS \`${tableName}\` (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  ${keys.map((k) => `\`${k}\` ${columnTypes[k]}`).join(", ")});`;
 
         await db.query(createQuery);
 
@@ -259,12 +316,13 @@ const upload = multer({ dest: "uploads/" });
       }
     });
 
-    app.get("/table", async (req, res) => {
+    app.get("/api/table", async (req, res) => {
       try {
-        const [rows] = await db.query("SELECT * FROM year2025");
+        const { tableName } = req.params;
+        const [rows] = await db.query(`SELECT * FROM ${tableName}`);
         const formattedRows = rows.map((row) => ({
           ...row,
-          registrationDate: dateFormat(row.registrationDate).format(
+          "Registration Date": dateFormat(row["Registration Date"]).format(
             "DD-MM-YYYY"
           ),
         }));
@@ -276,50 +334,34 @@ const upload = multer({ dest: "uploads/" });
 
     //-- Method to add data into the table with generation of registration number --
     // This method is used to add a new row to the table with a generated registration number
-    app.post("/table", async (req, res) => {
+    // Додати рядок у таблицю
+    app.post("/api/table/:tableName", async (req, res) => {
       try {
-        const {
-          name,
-          registrationDate,
-          information,
-          contact,
-          studentGroup,
-          documentType,
-          signingStatus,
-          op,
-        } = req.body;
-
-        if (!name) {
-          return res
-            .status(400)
-            .json({ error: "Missing required field: name" });
+        const tableName = req.params.tableName;
+        const data = req.body;
+        if (!tableName || !/^[a-zA-Z0-9_]+$/.test(tableName)) {
+          return res.status(400).json({ error: "Неправильна назва таблиці" });
         }
-
-        const registrationNumber = await auxiliary.generateRegistrationNumber(
-          "08-32",
-          db
-        );
-        const [result] = await db.query("INSERT INTO year2025 SET ?", {
-          name,
-          registrationNumber,
-          registrationDate,
-          information,
-          contact,
-          studentGroup,
-          documentType,
-          signingStatus,
-          op,
-        });
+        // Генерація номера якщо треба
+        if (data.StudentName && !data.RegistrationNumber) {
+          data.RegistrationNumber = await auxiliary.generateRegistrationNumber(
+            "08-32",
+            db
+          );
+        }
+        const [result] = await db.query(`INSERT INTO ${tableName} SET ?`, data);
         res.json({ id: result.insertId });
       } catch (err) {
-        console.error("Error in POST /table:", err);
+        console.error("Error in POST /api/table/:tableName:", err);
         res
           .status(500)
           .json({ error: "Internal Server Error", details: err.message });
       }
     });
 
-    app.get("/table/search/:input", async (req, res) => {
+    // Пошук у таблиці
+    app.get("/api/table/:tableName/search/:input", async (req, res) => {
+      const tableName = req.params.tableName;
       const input = req.params.input;
       if (!input) {
         return res
@@ -327,37 +369,34 @@ const upload = multer({ dest: "uploads/" });
           .json({ error: "Missing required query parameter: input" });
       }
       try {
-        const [results] = await auxiliary.searchInTable(input, db);
+        const [results] = await auxiliary.searchInTable(tableName, input, db);
         const formattedResults = results.map((row) => ({
           ...row,
-          registrationDate: dateFormat(row.registrationDate).format(
+          "Registration Date": dateFormat(row["Registration Date"]).format(
             "DD-MM-YYYY"
           ),
         }));
         res.json(formattedResults);
       } catch (err) {
-        console.error("Error in GET /table/search:", err);
+        console.error("Error in GET /api/table/:tableName/search/:input:", err);
         res
           .status(500)
           .json({ error: "Internal Server Error", details: err.message });
       }
     });
 
-    app.get("/table/sort/", async (req, res) => {
-      const sortBy = req.query.by || "name";
+    // Сортування таблиці
+    app.get("/api/table/:tableName/sort", async (req, res) => {
+      const tableName = req.params.tableName;
+  const sortBy = req.query.by || "StudentName";
       const order = req.query.order === "asc" ? "ASC" : "DESC";
-      const allowedFields = ["name", "registrationDate", "studentGroup"];
-
       try {
-        if (!allowedFields.includes(sortBy)) {
-          res.status(400).send("Invalid sort field");
-        }
         const [results] = await db.query(
-          `SELECT * FROM year2025 ORDER BY ${sortBy} ${order}`
+          `SELECT * FROM \`${tableName}\` ORDER BY \`${sortBy}\` ${order}`
         );
         const formattedResults = results.map((row) => ({
           ...row,
-          registrationDate: dateFormat(row.registrationDate).format(
+          "Registration Date": dateFormat(row["Registration Date"]).format(
             "DD-MM-YYYY"
           ),
         }));
@@ -365,43 +404,36 @@ const upload = multer({ dest: "uploads/" });
       } catch (err) {
         res
           .status(500)
-          .json({ error: "Cannot sort table by name", details: err.message });
+          .json({ error: "Cannot sort table", details: err.message });
       }
     });
 
-    app.get("/table/export", async (req, res) => {
-      const table = req.query.table;
-
-      if (!table) {
+    // Експорт таблиці
+    app.get("/api/table/:tableName/export", async (req, res) => {
+      const tableName = req.params.tableName;
+      if (!tableName) {
         return res.status(400).send("Table name is required");
       }
-
       try {
-        const [rows] = await db.query(`SELECT * FROM year2025`);
-
+        const [rows] = await db.query(`SELECT * FROM ${tableName}`);
         const workbook = new ExcelJs.Workbook();
-        const worksheet = workbook.addWorksheet(table);
-
+        const worksheet = workbook.addWorksheet(tableName);
         if (rows.length > 0) {
-          //Add column header
           worksheet.columns = Object.keys(rows[0]).map((key) => ({
             header: key,
             key: key,
             width: 20,
           }));
-
           rows.forEach((row) => worksheet.addRow(row));
         }
-
         res.setHeader(
           "Content-Type",
           "application/wnd.openxmlformats-officedocument.spreadsheetml.sheet"
         );
         res.setHeader(
           "Content-Description",
-          `attachment; filename=${table}.xlsx`
+          `attachment; filename=${tableName}.xlsx`
         );
-
         await workbook.xlsx.write(res);
         res.end();
       } catch (err) {
@@ -411,33 +443,21 @@ const upload = multer({ dest: "uploads/" });
     });
 
     //--HTTP clone row in table method--
-    app.post("/table/clone/:id", async (req, res) => {
+    // Клонування рядка
+    app.post("/api/table/:tableName/clone/:id", async (req, res) => {
+      const tableName = req.params.tableName;
       const id = req.params.id;
-
       try {
-        const [rows] = await db.query("SELECT * FROM year2025 WHERE id = ?", [
-          id,
-        ]);
+        const [rows] = await db.query(
+          `SELECT * FROM ${tableName} WHERE id = ?`,
+          [id]
+        );
         if (rows.length === 0) {
           return res.status(404).json({ error: "Row not found" });
         }
         const row = rows[0];
-
-        const [results] = await db.query(
-          "INSERT INTO year2025(name, registrationNumber, registrationDate, information, contact, studentGroup, documentType, signingStatus, op) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-          [
-            row.name,
-            row.registrationNumber,
-            row.registrationDate,
-            row.information,
-            row.contact,
-            row.studentGroup,
-            row.documentType,
-            row.signingStatus,
-            row.op,
-          ]
-        );
-
+        delete row.id; // не клонувати id
+        const [results] = await db.query(`INSERT INTO ${tableName} SET ?`, row);
         res.json({ id: results.insertId });
       } catch (err) {
         res.status(500).json(err);
@@ -445,33 +465,13 @@ const upload = multer({ dest: "uploads/" });
     });
 
     //--HTTP edit row in table method--
-    app.put("/table/:id", async (req, res) => {
-      const {
-        name,
-        registrationDate,
-        information,
-        contact,
-        studentGroup,
-        documentType,
-        signingStatus,
-        op,
-      } = req.body;
+    // Оновлення рядка
+    app.put("/api/table/:tableName/:id", async (req, res) => {
+      const tableName = req.params.tableName;
+      const id = req.params.id;
+      const data = req.body;
       try {
-        await db.query(
-          "UPDATE year2025 SET name = ?, registrationDate = ?, information = ?, contact = ?, studentGroup = ?, documentType = ?, signingStatus = ?, op = ? WHERE id = ?",
-          [
-            name,
-            registrationDate,
-            information,
-            contact,
-            studentGroup,
-            documentType,
-            signingStatus,
-            op,
-            req.params.id,
-          ]
-        );
-
+        await db.query(`UPDATE ${tableName} SET ? WHERE id = ?`, [data, id]);
         res.json({ message: "Row updated successfully" });
       } catch (err) {
         res.status(500).json(err);
@@ -479,9 +479,12 @@ const upload = multer({ dest: "uploads/" });
     });
 
     //--HTTP delete row in table method--
-    app.delete("/table/:id", async (req, res) => {
+    // Видалення рядка
+    app.delete("/api/table/:tableName/:id", async (req, res) => {
+      const tableName = req.params.tableName;
+      const id = req.params.id;
       try {
-        db.query(`DELETE FROM ${tableName} WHERE id = ?`, [req.params.id]);
+        await db.query(`DELETE FROM ${tableName} WHERE id = ?`, [id]);
         res.sendStatus(200);
       } catch (err) {
         res.status(500).json(err);
@@ -499,6 +502,26 @@ const upload = multer({ dest: "uploads/" });
         res.sendStatus(200);
       } catch (err) {
         res.status(500).json(err);
+      }
+    });
+
+    // Endpoint: отримати назви стовпців і коментарі для таблиці
+    app.get("/api/table/:tableName/columns", async (req, res) => {
+      try {
+        const tableName = req.params.tableName;
+        if (!tableName || !/^[a-zA-Z0-9_]+$/.test(tableName)) {
+          return res.status(400).json({ error: "Неправильна назва таблиці" });
+        }
+        // Отримати інформацію про стовпці з коментарями (якщо є)
+        const [columns] = await db.query(
+          `SHOW FULL COLUMNS FROM \`${tableName}\``
+        );
+        // Повертаємо масив: [{field, comment}]
+        res.json(
+          columns.map((col) => ({ field: col.Field, comment: col.Comment }))
+        );
+      } catch (err) {
+        res.status(500).json({ error: err.message });
       }
     });
 

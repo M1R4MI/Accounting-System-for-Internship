@@ -3,13 +3,13 @@ USE AccountingSystem;
 
 CREATE TABLE year2025(
 	ID INT auto_increment primary key,
-    registrationNumber varchar(30),
-    name varchar(255),
-    studentGroup varchar(30),
-    registrationDate DATE,
-    information varchar(500),
-    contact varchar(255),
-    documentType varchar(30),
-    signingStatus varchar(30),
-    op varchar(30)
+    RegistrationNumber varchar(30),
+    StudentName varchar(255),
+    StudentGroup varchar(30),
+    RegistrationDate DATE,
+    Information varchar(500),
+    Contact varchar(255),
+    DocumentType varchar(30),
+    SigningStatus varchar(30),
+    OccupationalSafety varchar(30)
 );
