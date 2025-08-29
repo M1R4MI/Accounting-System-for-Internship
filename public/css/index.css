@@ -1,18 +1,46 @@
-body {
-  background-color: #f5f7fa;
-  font-family: "Segoe UI", sans-serif;
-}
-.table th {
-  background-color: #003366;
-  color: white;
-}
-.btn-primary {
-  background-color: #0055aa;
-}
-.btn-primary:hover {
-  background-color: #004080;
+/* Mobile-first base styles */
+:root{
+  --bg:#f5f7fa;
+  --brand:#0055aa;
+  --brand-dark:#004080;
+  --th-bg:#003366;
 }
 
-.file-upload {
-  display: none;
+html,body{
+  margin:0;
+  padding:0;
+  background-color:var(--bg);
+  font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  font-size:16px;
+  line-height:1.4;
+}
+
+/* Hide native file input; keep accessible via label/button */
+.file-upload{display:none}
+
+/* Tables: make responsive on small screens */
+.table-container{width:100%;overflow-x:auto}
+table{width:100%;border-collapse:collapse;margin-top:0.75rem}
+th,td{padding:0.5rem 0.75rem;border:1px solid #e6e9ef;text-align:left}
+thead{background:#e9eef6}
+.table th{background-color:var(--th-bg);color:#fff}
+
+/* Buttons */
+.btn-primary{background-color:var(--brand);border-color:var(--brand);color:#fff}
+.btn-primary:hover{background-color:var(--brand-dark);border-color:var(--brand-dark)}
+
+/* Small helpers */
+.container{padding:1rem}
+
+/* Larger viewports — tablet and up */
+@media (min-width: 768px){
+  .container{max-width:960px;margin:0 auto;padding:1.5rem}
+  th,td{padding:0.75rem 1rem}
+}
+
+/* Desktop tweaks */
+@media (min-width: 1200px){
+  .container{max-width:1140px}
 }

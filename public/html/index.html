@@ -47,7 +47,9 @@
             class="file-upload"
             accept=".csv,.xlsx,.xls"
           />
-          <button class="btn btn-secondary" id="container__file-import">Імпорт таблиці</button>
+          <button class="btn btn-secondary" id="container__file-import">
+            Імпорт таблиці
+          </button>
         </div>
       </div>
 
@@ -109,14 +111,6 @@
             </div>
             <div class="modal-body">
               <div class="row g-3">
-                <div class="col-md-6">
-                  <input
-                    type="number"
-                    class="form-control"
-                    id="form__table-id"
-                    hidden
-                  />
-                </div>
                 <div class="col-md-6">
                   <label class="form-label" for="form__table-name"
                     >Назва таблиці</label
@@ -185,6 +179,14 @@
                     min="2000"
                     max="2200"
                     required
+                  />
+                </div>
+                <div class="col-md-6">
+                  <input
+                    type="number"
+                    class="form-control"
+                    id="form__table-id"
+                    hidden
                   />
                 </div>
               </div>
