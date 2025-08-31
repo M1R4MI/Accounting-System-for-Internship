@@ -1,11 +1,11 @@
-async function generateRegistrationNumber(departmentID, connection) {
+async function generateRegistrationNumber(tableName,departmentID, connection) {
   let d = new Date();
   let year = d.getFullYear().toString().substr(-2);
 
   const [rows] = await connection.execute(
-    `SELECT registrationNumber
-         FROM year2025
-         WHERE registrationNumber LIKE ?
+    `SELECT RegistrationNumber
+         FROM ${tableName}
+         WHERE RegistrationNumber LIKE ?
          ORDER BY id DESC LIMIT 1`,
     [`${departmentID}.%:%`]
   );
@@ -13,7 +13,7 @@ async function generateRegistrationNumber(departmentID, connection) {
   let nextSerial = 1;
 
   if (rows.length > 0) {
-    const lastReg = rows[0].registrationNumber;
+    const lastReg = rows[0].RegistrationNumber;
     const match = lastReg.match(/\.(\d+):/);
     if (match) {
       nextSerial = parseInt(match[1], 10) + 1;
@@ -26,11 +26,11 @@ async function generateRegistrationNumber(departmentID, connection) {
   return newRegistrationNumber;
 }
 
-async function searchInTable(table,input, connection) {
+async function searchInTable(tableName,input, connection) {
   try {
     const [result] = await connection.query(
-      `SELECT * FROM ${table}
-             WHERE name LIKE ? OR registrationNumber LIKE ?`,
+      `SELECT * FROM ${tableName}
+             WHERE StudentName LIKE ? OR RegistrationNumber LIKE ?`,
       [`%${input}%`, `%${input}%`]
     );
     return [result];

@@ -10,7 +10,7 @@ const multer = require("multer");
 const dateTime = auxiliary.getDateTime();
 
 const app = express();
-const upload = multer({ dest: "uploads/" });
+const upload = multer({ dest: "../uploads/" });
 (async () => {
   try {
     const db = await getDbConnection();
@@ -154,18 +154,18 @@ const upload = multer({ dest: "uploads/" });
         }
 
         const createTableSql = `
-      CREATE TABLE IF NOT EXISTS \`${tableName}\`(
-        ID INT auto_increment primary key,
-        RegistrationNumber varchar(30),
-        StudentName varchar(255),
-        \`Student Group\` varchar(30),
-        \`Registration Date\` DATE,
-        Information varchar(500),
-        Contact varchar(255),
-        DocumentType varchar(30),
-        SigningStatus varchar(30),
-        OccupationalSafety varchar(30)
-      );
+          CREATE TABLE IF NOT EXISTS \`${tableName}\`(
+            ID INT auto_increment primary key,
+            RegistrationNumber varchar(30),
+            StudentName varchar(255),
+            StudentGroup varchar(30),
+            RegistrationDate DATE,
+            Information varchar(500),
+            Contact varchar(255),
+            DocumentType varchar(30),
+            SigningStatus varchar(30),
+            OccupationalSafety varchar(30)
+          );
         `;
         await db.query(createTableSql);
 
@@ -205,8 +205,8 @@ const upload = multer({ dest: "uploads/" });
           "ID",
           "RegistrationNumber",
           "StudentName",
-          "Student Group",
-          "Registration Date",
+          "StudentGroup",
+          "RegistrationDate",
           "Information",
           "Contact",
           "DocumentType",
@@ -220,8 +220,8 @@ const upload = multer({ dest: "uploads/" });
         if (isStandard) {
           result.data = result.data.map((row) => ({
             ...row,
-            "Registration Date": row["Registration Date"]
-              ? dateFormat(row["Registration Date"]).format("DD-MM-YYYY")
+            "RegistrationDate": row["RegistrationDate"]
+              ? dateFormat(row["RegistrationDate"]).format("DD-MM-YYYY")
               : null,
           }));
         }
@@ -272,7 +272,7 @@ const upload = multer({ dest: "uploads/" });
         }
 
         //Create table if not exists
-  let createQuery = `CREATE TABLE IF NOT EXISTS \`${tableName}\` (
+        let createQuery = `CREATE TABLE IF NOT EXISTS \`${tableName}\` (
   id INT AUTO_INCREMENT PRIMARY KEY,
   ${keys.map((k) => `\`${k}\` ${columnTypes[k]}`).join(", ")});`;
 
@@ -322,7 +322,7 @@ const upload = multer({ dest: "uploads/" });
         const [rows] = await db.query(`SELECT * FROM ${tableName}`);
         const formattedRows = rows.map((row) => ({
           ...row,
-          "Registration Date": dateFormat(row["Registration Date"]).format(
+          "RegistrationDate": dateFormat(row["RegistrationDate"]).format(
             "DD-MM-YYYY"
           ),
         }));
@@ -345,6 +345,7 @@ const upload = multer({ dest: "uploads/" });
         // Генерація номера якщо треба
         if (data.StudentName && !data.RegistrationNumber) {
           data.RegistrationNumber = await auxiliary.generateRegistrationNumber(
+            tableName,
             "08-32",
             db
           );
@@ -372,7 +373,7 @@ const upload = multer({ dest: "uploads/" });
         const [results] = await auxiliary.searchInTable(tableName, input, db);
         const formattedResults = results.map((row) => ({
           ...row,
-          "Registration Date": dateFormat(row["Registration Date"]).format(
+          "RegistrationDate": dateFormat(row["RegistrationDate"]).format(
             "DD-MM-YYYY"
           ),
         }));
@@ -388,7 +389,7 @@ const upload = multer({ dest: "uploads/" });
     // Сортування таблиці
     app.get("/api/table/:tableName/sort", async (req, res) => {
       const tableName = req.params.tableName;
-  const sortBy = req.query.by || "StudentName";
+      const sortBy = req.query.by || "StudentName";
       const order = req.query.order === "asc" ? "ASC" : "DESC";
       try {
         const [results] = await db.query(
@@ -396,7 +397,7 @@ const upload = multer({ dest: "uploads/" });
         );
         const formattedResults = results.map((row) => ({
           ...row,
-          "Registration Date": dateFormat(row["Registration Date"]).format(
+          "RegistrationDate": dateFormat(row["RegistrationDate"]).format(
             "DD-MM-YYYY"
           ),
         }));
@@ -443,7 +444,6 @@ const upload = multer({ dest: "uploads/" });
     });
 
     //--HTTP clone row in table method--
-    // Клонування рядка
     app.post("/api/table/:tableName/clone/:id", async (req, res) => {
       const tableName = req.params.tableName;
       const id = req.params.id;
@@ -505,7 +505,7 @@ const upload = multer({ dest: "uploads/" });
       }
     });
 
-    // Endpoint: отримати назви стовпців і коментарі для таблиці
+    // Endpoint: отримати назви стовпців і коментарі для таблиці(потрібно для створення кастомних таблиць, які були імпортовані і не мають стандартних стовпців)
     app.get("/api/table/:tableName/columns", async (req, res) => {
       try {
         const tableName = req.params.tableName;
