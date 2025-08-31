@@ -1,5 +1,3 @@
-// Викликати при завантаженні сторінки
-window.addEventListener("DOMContentLoaded", loadMetaAndGroups);
 const API_URL = "/api/table";
 const tableBody = document.querySelector("#dataTable tbody");
 const form = document.querySelector("#addForm");
@@ -98,26 +96,20 @@ function table(data) {
     }
     // Додаємо стовпець з діями (Bootstrap Icons)
     tds += `<td style='align-items: center;'>
-      <button class="btn btn-outline-primary btn-sm me-1" title="Редагувати" onclick='editRow(${JSON.stringify(
-        row
-      ).replace(/"/g, "&quot;")})'>
+      <button class="btn btn-outline-primary btn-sm me-1" title="Редагувати" onclick='editRow(${JSON.stringify(row).replace(/"/g, "&quot;")})'>
         <i class="bi bi-pencil"></i>
       </button>
-      <button class="btn btn-outline-danger btn-sm me-1" title="Видалити" onclick='deleteRow(${
-        row.ID
-      })'>
+      <button class="btn btn-outline-danger btn-sm me-1" title="Видалити" onclick='deleteRow(${row.ID})'>
         <i class="bi bi-trash"></i>
       </button>
-      <button class="btn btn-outline-secondary btn-sm" title="Клонувати" onclick='cloneRow(${
-        row.ID
-      })'>
+      <button class="btn btn-outline-secondary btn-sm" title="Клонувати" onclick='cloneRow(${row.ID})'>
         <i class="bi bi-files"></i>
       </button>
     </td>`;
     tr.innerHTML = tds;
     tableBody.appendChild(tr);
   });
-  loadTable();
+  // Removed recursive loadTable();
 }
 // Отримати назву таблиці з параметра URL (наприклад, ?table=mainDataTable)
 function getTableNameFromURL() {
@@ -136,21 +128,19 @@ async function loadTable() {
 }
 
 function editRow(row) {
-  document.getElementById("editFormDiv").style.display = "block";
+  // Заповнюємо поля модального вікна редагування
   document.getElementById("editId").value = row.ID;
-  document.getElementById("editRegistrationNumber").value =
-    row["RegistrationNumber"] || "";
-  document.getElementById("editStudentName").value = row["StudentName"] || "";
-  document.getElementById("editStudentGroup").value = row["StudentGroup"] || "";
-  document.getElementById("editRegistrationDate").value =
-    row["RegistrationDate"] || "";
+  document.getElementById("editNameField").value = row["StudentName"] || "";
+  document.getElementById("editGroup").value = row["StudentGroup"] || "";
+  document.getElementById("editRegistrationDate").value = row["RegistrationDate"] || "";
   document.getElementById("editInformation").value = row["Information"] || "";
   document.getElementById("editContact").value = row["Contact"] || "";
   document.getElementById("editDocumentType").value = row["DocumentType"] || "";
-  document.getElementById("editSigningStatus").value =
-    row["SigningStatus"] || "";
-  document.getElementById("editOccupationalSafety").value =
-    row["OccupationalSafety"] || "";
+  document.getElementById("editSigningStatus").value = row["SigningStatus"] || "";
+  document.getElementById("editOp").value = row["OccupationalSafety"] || "";
+  // Відкрити модальне вікно Bootstrap
+  const editModal = new bootstrap.Modal(document.getElementById('editModal'));
+  editModal.show();
 }
 
 async function deleteRow(id) {
@@ -273,17 +263,14 @@ if (editForm) {
 
     const id = document.getElementById("editId").value;
     const data = {
-      StudentName: document.getElementById("editStudentName").value,
-      RegistrationNumber: document.getElementById("editRegistrationNumber")
-        .value,
+      StudentName: document.getElementById("editNameField").value,
       RegistrationDate: document.getElementById("editRegistrationDate").value,
       Information: document.getElementById("editInformation").value,
       Contact: document.getElementById("editContact").value,
-      StudentGroup: document.getElementById("editStudentGroup").value,
+      StudentGroup: document.getElementById("editGroup").value,
       DocumentType: document.getElementById("editDocumentType").value,
       SigningStatus: document.getElementById("editSigningStatus").value,
-      OccupationalSafety: document.getElementById("editOccupationalSafety")
-        .value,
+      OccupationalSafety: document.getElementById("editOp").value,
     };
 
     try {
@@ -297,45 +284,14 @@ if (editForm) {
       );
       await res.json();
       await loadTable();
-      closeEditForm();
+      // Закрити модальне вікно Bootstrap після збереження
+      const editModal = bootstrap.Modal.getInstance(document.getElementById('editModal'));
+      if (editModal) editModal.hide();
     } catch (err) {
       console.error("Error: ", err);
       console.log("Update failed!");
     }
   });
-}
-
-// Завантаження meta-даних та генерація груп
-async function loadMetaAndGroups() {
-  try {
-    // Якщо потрібно для конкретної таблиці, підставити id або tableName
-    const res = await fetch("/api/meta_tables");
-    const meta = await res.json();
-    // Якщо meta повертає пагінацію, беремо meta.data
-    const metaData = meta.data ? meta.data[0] : meta[0] || meta;
-    if (!metaData) return;
-
-    const groupSelect = document.getElementById("group");
-    if (!groupSelect) return;
-    groupSelect.innerHTML = "";
-    const code = metaData.department || "КН";
-    const count = metaData.groups_count || 1;
-    const year = metaData.entry_year
-      ? metaData.entry_year.toString().slice(-2)
-      : new Date().getFullYear().toString().slice(-2);
-    for (let i = 1; i <= count; i++) {
-      const num = i.toString().padStart(2, "0");
-      const groupName = `${num}${code}-${year}`;
-      const option = document.createElement("option");
-      option.value = groupName;
-      option.textContent = groupName;
-      groupSelect.appendChild(option);
-    }
-    // Зберігаємо для генерації номера
-    window._metaData = metaData;
-  } catch (e) {
-    console.error("Не вдалося завантажити meta_tables:", e);
-  }
 }
 
 //--Event listener for add form--
