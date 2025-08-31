@@ -4,6 +4,7 @@ const API_URL = "/api/table";
 const tableBody = document.querySelector("#dataTable tbody");
 const form = document.querySelector("#addForm");
 const formTitle = document.getElementById("formHead");
+const tableName = getTableNameFromURL();
 let sortOrder = "asc";
 const rowsPerPage = 20;
 // Викликати при відкритті модального вікна додавання
@@ -40,7 +41,6 @@ document
     const useStandard =
       columns.length === standardColumns.length &&
       standardColumns.every((col, i) => col === columns[i]);
-    const tableName = getTableNameFromURL();
   });
 
 // Автоматична генерація таблиці залежно від стовпців
@@ -127,7 +127,6 @@ function getTableNameFromURL() {
 
 async function loadTable() {
   try {
-    const tableName = getTableNameFromURL();
     const res = await fetch(`${API_URL}/${encodeURIComponent(tableName)}`);
     const data = await res.json();
     table(data);
@@ -139,21 +138,24 @@ async function loadTable() {
 function editRow(row) {
   document.getElementById("editFormDiv").style.display = "block";
   document.getElementById("editId").value = row.ID;
-  document.getElementById("editRegistrationNumber").value = row["RegistrationNumber"] || "";
+  document.getElementById("editRegistrationNumber").value =
+    row["RegistrationNumber"] || "";
   document.getElementById("editStudentName").value = row["StudentName"] || "";
   document.getElementById("editStudentGroup").value = row["StudentGroup"] || "";
-  document.getElementById("editRegistrationDate").value = row["RegistrationDate"] || "";
+  document.getElementById("editRegistrationDate").value =
+    row["RegistrationDate"] || "";
   document.getElementById("editInformation").value = row["Information"] || "";
   document.getElementById("editContact").value = row["Contact"] || "";
   document.getElementById("editDocumentType").value = row["DocumentType"] || "";
-  document.getElementById("editSigningStatus").value = row["SigningStatus"] || "";
-  document.getElementById("editOccupationalSafety").value = row["OccupationalSafety"] || "";
+  document.getElementById("editSigningStatus").value =
+    row["SigningStatus"] || "";
+  document.getElementById("editOccupationalSafety").value =
+    row["OccupationalSafety"] || "";
 }
 
 async function deleteRow(id) {
   if (confirm("Ви дійсно хочете видалити цей рядок?")) {
     try {
-      const tableName = getTableNameFromURL();
       await fetch(`${API_URL}/${encodeURIComponent(tableName)}/${id}`, {
         method: "DELETE",
       });
@@ -166,7 +168,6 @@ async function deleteRow(id) {
 
 async function cloneRow(id) {
   try {
-    const tableName = getTableNameFromURL();
     await fetch(`${API_URL}/${encodeURIComponent(tableName)}/clone/${id}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -183,7 +184,6 @@ async function searchInTable() {
   const input = document.getElementById("searchInput").value;
   try {
     if (input !== "") {
-      const tableName = getTableNameFromURL();
       const res = await fetch(
         `${API_URL}/${encodeURIComponent(
           tableName
@@ -205,7 +205,6 @@ async function searchInTable() {
 
 async function performSearch(column, order = "DESC") {
   try {
-    const tableName = getTableNameFromURL();
     const res = await fetch(
       `${API_URL}/${encodeURIComponent(
         tableName
@@ -275,18 +274,19 @@ if (editForm) {
     const id = document.getElementById("editId").value;
     const data = {
       StudentName: document.getElementById("editStudentName").value,
-      RegistrationNumber: document.getElementById("editRegistrationNumber").value,
+      RegistrationNumber: document.getElementById("editRegistrationNumber")
+        .value,
       RegistrationDate: document.getElementById("editRegistrationDate").value,
       Information: document.getElementById("editInformation").value,
       Contact: document.getElementById("editContact").value,
       StudentGroup: document.getElementById("editStudentGroup").value,
       DocumentType: document.getElementById("editDocumentType").value,
       SigningStatus: document.getElementById("editSigningStatus").value,
-      OccupationalSafety: document.getElementById("editOccupationalSafety").value,
+      OccupationalSafety: document.getElementById("editOccupationalSafety")
+        .value,
     };
 
     try {
-      const tableName = getTableNameFromURL();
       const res = await fetch(
         `${API_URL}/${encodeURIComponent(tableName)}/${id}`,
         {
@@ -353,18 +353,17 @@ if (addForm) {
     const idEl = document.getElementById("id");
     const id = idEl ? idEl.value : "";
     const data = {
-    StudentName: getVal("nameField"),
-    RegistrationDate: getVal("registrationDate"),
-    Information: getVal("information"),
-    Contact: getVal("contact"),
-    StudentGroup: getVal("group"),
-    DocumentType: getVal("documentType"),
-    SigningStatus: getVal("signingStatus"),
-    OccupationalSafety: getVal("op"),
+      StudentName: getVal("nameField"),
+      RegistrationDate: getVal("registrationDate"),
+      Information: getVal("information"),
+      Contact: getVal("contact"),
+      StudentGroup: getVal("group"),
+      DocumentType: getVal("documentType"),
+      SigningStatus: getVal("signingStatus"),
+      OccupationalSafety: getVal("op"),
     };
 
     try {
-      const tableName = getTableNameFromURL();
       await fetch(`${API_URL}/${encodeURIComponent(tableName)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -377,6 +376,13 @@ if (addForm) {
       console.error("Failed to add row: ", err);
     }
   });
+}
+
+const exportBtn = document.getElementById("exportBtn");
+if (exportBtn) {
+  exportBtn.addEventListener('click', () => {
+    exportTable(tableName);
+  })
 }
 
 loadTable();
