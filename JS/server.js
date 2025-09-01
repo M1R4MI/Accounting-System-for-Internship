@@ -220,7 +220,7 @@ const upload = multer({ dest: "../uploads/" });
         if (isStandard) {
           result.data = result.data.map((row) => ({
             ...row,
-            "RegistrationDate": row["RegistrationDate"]
+            RegistrationDate: row["RegistrationDate"]
               ? dateFormat(row["RegistrationDate"]).format("DD-MM-YYYY")
               : null,
           }));
@@ -322,7 +322,7 @@ const upload = multer({ dest: "../uploads/" });
         const [rows] = await db.query(`SELECT * FROM ${tableName}`);
         const formattedRows = rows.map((row) => ({
           ...row,
-          "RegistrationDate": dateFormat(row["RegistrationDate"]).format(
+          RegistrationDate: dateFormat(row["RegistrationDate"]).format(
             "DD-MM-YYYY"
           ),
         }));
@@ -373,7 +373,7 @@ const upload = multer({ dest: "../uploads/" });
         const [results] = await auxiliary.searchInTable(tableName, input, db);
         const formattedResults = results.map((row) => ({
           ...row,
-          "RegistrationDate": dateFormat(row["RegistrationDate"]).format(
+          RegistrationDate: dateFormat(row["RegistrationDate"]).format(
             "DD-MM-YYYY"
           ),
         }));
@@ -397,7 +397,7 @@ const upload = multer({ dest: "../uploads/" });
         );
         const formattedResults = results.map((row) => ({
           ...row,
-          "RegistrationDate": dateFormat(row["RegistrationDate"]).format(
+          RegistrationDate: dateFormat(row["RegistrationDate"]).format(
             "DD-MM-YYYY"
           ),
         }));
@@ -457,7 +457,9 @@ const upload = multer({ dest: "../uploads/" });
         }
         const row = rows[0];
         delete row.id; // не клонувати id
-        const [results] = await db.query(`INSERT INTO ${tableName} SET ?`, row);
+        const [results] = await db.query(`INSERT INTO ${tableName} SET ?`, [
+          row,
+        ]);
         res.json({ id: results.insertId });
       } catch (err) {
         res.status(500).json(err);
@@ -562,6 +564,30 @@ const upload = multer({ dest: "../uploads/" });
         totalPages: Math.ceil(total / limit),
       };
     }
+
+    // Отримати список груп для селекту
+    app.get("/api/groups/:tableName", async (req, res) => {
+      const tableName = req.params.tableName;
+      try {
+        const [rows] = await db.query(
+          `SELECT groups_count, entry_year FROM meta_tables WHERE tableName='${tableName}';`
+        );
+        let groups = [];
+        rows.forEach((row) => {
+          const yearShort = row.entry_year ? row.entry_year.toString().slice(-2) : "";
+          for (let i = 1; i <= row.groups_count; i++) {
+            groups.push({
+              id: `${i}КН-${yearShort}б`,
+              label: `${i}КН-${yearShort}б`,
+            });
+          }
+        });
+        res.json(groups);
+      } catch (err) {
+        console.error("Помилка при отриманні груп:", err);
+        res.status(500).json({ error: "Не вдалося отримати групи" });
+      }
+    });
   } catch (err) {
     console.error("Failed to start server: ", err);
   }

@@ -41,6 +41,32 @@ document
       standardColumns.every((col, i) => col === columns[i]);
   });
 
+// Функція для завантаження груп у <select>
+async function loadGroupsToSelect() {
+  try {
+    const res = await fetch(`/api/groups/${encodeURIComponent(tableName)}`);
+    const groups = await res.json();
+    const groupSelect = document.getElementById("group");
+    if (groupSelect) {
+      groupSelect.innerHTML = "";
+      groups.forEach((g) => {
+        const option = document.createElement("option");
+        option.value = g.id;
+        option.textContent = g.label;
+        groupSelect.appendChild(option);
+      });
+    }
+  } catch (err) {
+    console.error("Не вдалося завантажити групи:", err);
+  }
+}
+
+// Викликати при відкритті модального вікна додавання
+document.getElementById("addModal").addEventListener("show.bs.modal", async () => {
+  await loadGroupsToSelect();
+  // ...existing code...
+});
+
 // Автоматична генерація таблиці залежно від стовпців
 function table(data) {
   tableBody.innerHTML = "";
@@ -96,20 +122,25 @@ function table(data) {
     }
     // Додаємо стовпець з діями (Bootstrap Icons)
     tds += `<td style='align-items: center;'>
-      <button class="btn btn-outline-primary btn-sm me-1" title="Редагувати" onclick='editRow(${JSON.stringify(row).replace(/"/g, "&quot;")})'>
+      <button class="btn btn-outline-primary btn-sm me-1" title="Редагувати" onclick='editRow(${JSON.stringify(
+        row
+      ).replace(/"/g, "&quot;")})'>
         <i class="bi bi-pencil"></i>
       </button>
-      <button class="btn btn-outline-danger btn-sm me-1" title="Видалити" onclick='deleteRow(${row.ID})'>
+      <button class="btn btn-outline-danger btn-sm me-1" title="Видалити" onclick='deleteRow(${
+        row.ID
+      })'>
         <i class="bi bi-trash"></i>
       </button>
-      <button class="btn btn-outline-secondary btn-sm" title="Клонувати" onclick='cloneRow(${row.ID})'>
+      <button class="btn btn-outline-secondary btn-sm" title="Клонувати" onclick='cloneRow(${
+        row.ID
+      })'>
         <i class="bi bi-files"></i>
       </button>
     </td>`;
     tr.innerHTML = tds;
     tableBody.appendChild(tr);
   });
-  // Removed recursive loadTable();
 }
 // Отримати назву таблиці з параметра URL (наприклад, ?table=mainDataTable)
 function getTableNameFromURL() {
@@ -127,19 +158,42 @@ async function loadTable() {
   }
 }
 
-function editRow(row) {
+async function loadGroupsToEditSelect(selectedValue = "") {
+  try {
+    const res = await fetch(`/api/groups/${encodeURIComponent(tableName)}`);
+    const groups = await res.json();
+    const groupSelect = document.getElementById("editGroup");
+    if (groupSelect) {
+      groupSelect.innerHTML = "";
+      groups.forEach((g) => {
+        const option = document.createElement("option");
+        option.value = g.id;
+        option.textContent = g.label;
+        if (g.id === selectedValue) option.selected = true;
+        groupSelect.appendChild(option);
+      });
+    }
+  } catch (err) {
+    console.error("Не вдалося завантажити групи для редагування:", err);
+  }
+}
+
+async function editRow(row) {
   // Заповнюємо поля модального вікна редагування
   document.getElementById("editId").value = row.ID;
   document.getElementById("editNameField").value = row["StudentName"] || "";
+  await loadGroupsToEditSelect(row["StudentGroup"] || "");
   document.getElementById("editGroup").value = row["StudentGroup"] || "";
-  document.getElementById("editRegistrationDate").value = row["RegistrationDate"] || "";
+  document.getElementById("editRegistrationDate").value =
+    row["RegistrationDate"] || "";
   document.getElementById("editInformation").value = row["Information"] || "";
   document.getElementById("editContact").value = row["Contact"] || "";
   document.getElementById("editDocumentType").value = row["DocumentType"] || "";
-  document.getElementById("editSigningStatus").value = row["SigningStatus"] || "";
+  document.getElementById("editSigningStatus").value =
+    row["SigningStatus"] || "";
   document.getElementById("editOp").value = row["OccupationalSafety"] || "";
   // Відкрити модальне вікно Bootstrap
-  const editModal = new bootstrap.Modal(document.getElementById('editModal'));
+  const editModal = new bootstrap.Modal(document.getElementById("editModal"));
   editModal.show();
 }
 
@@ -158,12 +212,17 @@ async function deleteRow(id) {
 
 async function cloneRow(id) {
   try {
-    await fetch(`${API_URL}/${encodeURIComponent(tableName)}/clone/${id}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    });
+    const res = await fetch(
+      `${API_URL}/${encodeURIComponent(tableName)}/clone/${id}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      }
+    );
     await loadTable();
-    console.log("Data cloned successfully!");
+    if (res.ok) {
+      console.log("Data cloned successfully!");
+    }
   } catch (err) {
     console.error("Error", err);
     console.log("Clone failed!");
@@ -285,7 +344,9 @@ if (editForm) {
       await res.json();
       await loadTable();
       // Закрити модальне вікно Bootstrap після збереження
-      const editModal = bootstrap.Modal.getInstance(document.getElementById('editModal'));
+      const editModal = bootstrap.Modal.getInstance(
+        document.getElementById("editModal")
+      );
       if (editModal) editModal.hide();
     } catch (err) {
       console.error("Error: ", err);
@@ -336,9 +397,9 @@ if (addForm) {
 
 const exportBtn = document.getElementById("exportBtn");
 if (exportBtn) {
-  exportBtn.addEventListener('click', () => {
+  exportBtn.addEventListener("click", () => {
     exportTable(tableName);
-  })
+  });
 }
 
 loadTable();
