@@ -59,31 +59,26 @@
           <button
             class="btn btn-outline-secondary dropdown-toggle"
             type="button"
-            T-bs-toggle="dropdown"
+            id="filterBtn"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
           >
             <i class="bi bi-funnel"></i> Фільтр
           </button>
-          <ul class="dropdown-menu">
+          <ul class="dropdown-menu" aria-labelledby="filterBtn">
             <li>
-              <button class="dropdown-item" onclick="sortBy('name')">
-                За іменем
-              </button>
+              <button class="dropdown-item" onclick="sortBy('name')">За іменем</button>
             </li>
             <li>
-              <button class="dropdown-item" onclick="sortBy('studentGroup')">
-                За групою
-              </button>
+              <button class="dropdown-item" onclick="sortBy('studentGroup')">За групою</button>
             </li>
             <li>
-              <button
-                class="dropdown-item"
-                onclick="sortBy('registrationDate')"
-              >
-                За датою
-              </button>
+              <button class="dropdown-item" onclick="sortBy('registrationDate')">За датою</button>
             </li>
           </ul>
         </div>
+
+        <!-- Панель фільтрів (можна стилізувати та додати поля) -->
 
         <!-- Експорт -->
         <button

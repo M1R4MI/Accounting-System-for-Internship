@@ -370,6 +370,8 @@ const upload = multer({ dest: "../uploads/" });
           .json({ error: "Missing required query parameter: input" });
       }
       try {
+        // Перевірка імені таблиці
+        auxiliary.safeTableName(tableName);
         const [results] = await auxiliary.searchInTable(tableName, input, db);
         const formattedResults = results.map((row) => ({
           ...row,
@@ -574,7 +576,9 @@ const upload = multer({ dest: "../uploads/" });
         );
         let groups = [];
         rows.forEach((row) => {
-          const yearShort = row.entry_year ? row.entry_year.toString().slice(-2) : "";
+          const yearShort = row.entry_year
+            ? row.entry_year.toString().slice(-2)
+            : "";
           for (let i = 1; i <= row.groups_count; i++) {
             groups.push({
               id: `${i}КН-${yearShort}б`,

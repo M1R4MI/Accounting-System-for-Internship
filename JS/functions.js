@@ -27,11 +27,25 @@ async function generateRegistrationNumber(tableName,departmentID, connection) {
 }
 
 async function searchInTable(tableName,input, connection) {
+  // Додаємо перевірку імені таблиці
+  safeTableName(tableName);
   try {
+    // Пошук по всіх основних текстових полях
+    const fields = [
+      "StudentName",
+      "RegistrationNumber",
+      "StudentGroup",
+      "Information",
+      "Contact",
+      "DocumentType",
+      "SigningStatus",
+      "OccupationalSafety"
+    ];
+    const likeClause = fields.map(f => `${f} LIKE ?`).join(" OR ");
+    const params = Array(fields.length).fill(`%${input}%`);
     const [result] = await connection.query(
-      `SELECT * FROM ${tableName}
-             WHERE StudentName LIKE ? OR RegistrationNumber LIKE ?`,
-      [`%${input}%`, `%${input}%`]
+      `SELECT * FROM \`${tableName}\` WHERE ${likeClause}`,
+      params
     );
     return [result];
   } catch (err) {

@@ -274,12 +274,11 @@ function sortBy(column) {
   //sortOrder = (sortOrder === 'desc') ? 'asc' : 'desc'; // Toggle order
   // Мапінг для стандартних назв
   const columnMap = {
-    name: "name",
-    studentGroup: "studentGroup",
-    registrationDate: "registrationDate",
+    name: "StudentName",
+    studentGroup: "StudentGroup",
+    registrationDate: "RegistrationDate",
   };
   performSearch(columnMap[column] || column, sortOrder);
-  // document.getElementById("filterFormDiv").style.display = "none";
 }
 
 //Export function with redirection to the server
