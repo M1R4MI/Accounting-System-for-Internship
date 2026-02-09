@@ -219,18 +219,13 @@ async function cloneRow(id) {
         headers: { "Content-Type": "application/json" },
       }
     );
-
-    if (!res.ok) {
-      const error = await res.json();
-      throw new Error(error.error || "Failed to clone row");
-    }
-
-    const data = await res.json();
-    console.log("Data cloned successfully! New ID:", data.id);
     await loadTable();
+    if (res.ok) {
+      console.log("Data cloned successfully!");
+    }
   } catch (err) {
-    console.error("Clone failed:", err.message);
-    alert(`Clone failed: ${err.message}`);
+    console.error("Error", err);
+    console.log("Clone failed!");
   }
 }
 

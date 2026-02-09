@@ -46,6 +46,3 @@ async function getDbConnection() {
 }
 
 module.exports = getDbConnection;
-
-
-module.exports = getDbConnection;
