@@ -10,7 +10,7 @@ const multer = require("multer");
 const dateTime = auxiliary.getDateTime();
 
 const app = express();
-const upload = multer({ dest: "../uploads/" });
+const upload = multer({ dest: "./uploads/" });
 (async () => {
   try {
     const db = await getDbConnection();
@@ -22,9 +22,9 @@ const upload = multer({ dest: "../uploads/" });
 
     app.use(cors());
     app.use(bodyParser.json());
-    app.use(express.static("../public"));
-    app.use(express.static("../public/html"));
-    app.use("/css", express.static("../public/css"));
+    app.use(express.static("./public"));
+    app.use(express.static("./public/html"));
+    app.use("/css", express.static("./public/css"));
     app.use("/JS", express.static(__dirname));
 
     // Endpoint: отримати метадані таблиці по id
@@ -350,7 +350,16 @@ const upload = multer({ dest: "../uploads/" });
             db
           );
         }
-        const [result] = await db.query(`INSERT INTO ${tableName} SET ?`, data);
+        // Build INSERT query with proper placeholders
+        const columns = Object.keys(data);
+        const values = Object.values(data);
+        const placeholders = columns.map(() => "?").join(", ");
+        const columnsList = columns.map((col) => `\`${col}\``).join(", ");
+
+        const [result] = await db.query(
+          `INSERT INTO \`${tableName}\` (${columnsList}) VALUES (${placeholders})`,
+          values
+        );
         res.json({ id: result.insertId });
       } catch (err) {
         console.error("Error in POST /api/table/:tableName:", err);
@@ -451,20 +460,32 @@ const upload = multer({ dest: "../uploads/" });
       const id = req.params.id;
       try {
         const [rows] = await db.query(
-          `SELECT * FROM ${tableName} WHERE id = ?`,
+          `SELECT * FROM \`${tableName}\` WHERE id = ?`,
           [id]
         );
         if (rows.length === 0) {
           return res.status(404).json({ error: "Row not found" });
         }
         const row = rows[0];
-        delete row.id; // не клонувати id
-        const [results] = await db.query(`INSERT INTO ${tableName} SET ?`, [
-          row,
-        ]);
+        
+        // Remove ID field (handle both 'id' and 'ID' cases)
+        delete row.id;
+        delete row.ID;
+
+        // Build INSERT query with proper placeholders
+        const columns = Object.keys(row).filter(col => col.toLowerCase() !== 'id');
+        const values = columns.map(col => row[col]);
+        const placeholders = columns.map(() => "?").join(", ");
+        const columnsList = columns.map((col) => `\`${col}\``).join(", ");
+
+        const [results] = await db.query(
+          `INSERT INTO \`${tableName}\` (${columnsList}) VALUES (${placeholders})`,
+          values
+        );
         res.json({ id: results.insertId });
       } catch (err) {
-        res.status(500).json(err);
+        console.error("Clone error:", err);
+        res.status(500).json({ error: err.message });
       }
     });
 
@@ -475,10 +496,19 @@ const upload = multer({ dest: "../uploads/" });
       const id = req.params.id;
       const data = req.body;
       try {
-        await db.query(`UPDATE ${tableName} SET ? WHERE id = ?`, [data, id]);
+        // Build UPDATE query with proper placeholders
+        const columns = Object.keys(data).map((col) => `\`${col}\` = ?`);
+        const values = Object.values(data);
+        const set = columns.join(", ");
+
+        await db.query(
+          `UPDATE \`${tableName}\` SET ${set} WHERE id = ?`,
+          [...values, id]
+        );
         res.json({ message: "Row updated successfully" });
       } catch (err) {
-        res.status(500).json(err);
+        console.error("Update error:", err);
+        res.status(500).json({ error: err.message });
       }
     });
 

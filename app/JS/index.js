@@ -57,8 +57,8 @@ async function loadTables(page, limit = 10) {
         <td>${row.created_at ?? ""}</td>
         <td>${row.updated_at ?? ""}</td>
         <td>
-          <button class="btn btn-sm btn-outline-warning" onclick="editTable('${id}')"><img src="../images/edit-icon.png" width="25" heigth="35" style= "padding: 1px;" /></button>
-          <button class="btn btn-sm btn-outline-danger" onclick="deleteTable('${id}')"><img src="../images/delete-icon.png" width="25" heigth="35"style= "padding: 1px;" /></button>
+          <button class="btn btn-sm btn-outline-warning" onclick="editTable('${id}')"><i class="bi bi-pencil"></i></button>
+          <button class="btn btn-sm btn-outline-danger" onclick="deleteTable('${id}')"><i class="bi bi-trash"></i></button>
         </td>
       `;
     // Додаємо стилі курсора та обробник кліку
