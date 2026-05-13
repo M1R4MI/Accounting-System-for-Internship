@@ -3,6 +3,8 @@ const fileInput = document.getElementById("container__file-input");
 const importButton = document.getElementById("container__file-import");
 const tableBody = document.querySelector("#meta__table tbody");
 
+
+
 // відкриваємо системну форму вибору файлу з системи
 importButton.addEventListener("click", () => {
   fileInput.click();
@@ -34,49 +36,56 @@ fileInput.addEventListener("change", async (event) => {
 
 // Завантаження таблиць з бекенду
 async function loadTables(page, limit = 10) {
-  const res = await fetch(`/api/meta_tables?page=${page}&limit=${limit}`);
-  if (!res.ok) {
-    console.error("Failed to load meta_tables:", res.status, await res.text());
-    return;
+  if (!localStorage.getItem('jwt_token')) return; 
+    
+  try {
+      const response = await fetch(`/api/meta_tables?page=${page}&limit=10`);
+      const data = await response.json();
+      
+      const tbody = document.getElementById("tables-list");
+      tbody.innerHTML = "";
+
+      // Рендеримо рядки
+      data.data.forEach(table => {
+          // Перевіряємо, в якому полі прийшла назва, щоб вона не була порожньою
+          const tName = table.tableName || table.name || "Без назви";
+          const displayName = table.name || table.tableName || "Без назви";
+          const faculty = table.faculty || "-";
+          const speciality = table.speciality_code || "-";
+
+          tbody.innerHTML += `
+              <tr>
+                  <td>${table.id}</td>
+                  <td>
+                      <a href="/table?table=${tName}" class="text-decoration-none fw-bold text-primary">
+                          ${displayName}
+                      </a>
+                  </td>
+                  <td>${faculty}</td>
+                  <td>${speciality}</td>
+                  <td>${table.created_at}</td>
+                  <td>${table.updated_at}</td>
+                  <td>
+                      <button class="btn btn-sm btn-outline-warning me-1" onclick="editTable(${table.id}, '${tName}')" title="Редагувати">
+                          <i class="bi bi-pencil"></i>
+                      </button>
+                      <button class="btn btn-sm btn-outline-danger" onclick="deleteTable(${table.id}, '${tName}')" title="Видалити">
+                          <i class="bi bi-trash"></i>
+                      </button>
+                  </td>
+              </tr>
+          `;
+      });
+
+      // Логіка показу/сховання пагінації
+      const paginationNav = document.getElementById('pagination-nav');
+      if (paginationNav) {
+          paginationNav.style.display = data.totalPages <= 1 ? 'none' : 'block';
+      }
+
+  } catch (err) {
+      console.error("Помилка завантаження списку:", err);
   }
-
-  const payload = await res.json();
-  // payload may be { data: [...], totalPages, page, total }
-  const rows = Array.isArray(payload) ? payload : payload.data || [];
-  const totalPages = payload.totalPages || 1;
-
-  tableBody.innerHTML = "";
-  rows.forEach((row) => {
-    const id = row.id ?? row.tableName ?? row.name ?? "";
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-        <td>${row.id ?? ""}</td>
-        <td>${row.name ?? ""}</td>
-        <td>${row.faculty ?? ""}</td>
-        <td>${row.speciality_code ?? ""}</td>
-        <td>${row.created_at ?? ""}</td>
-        <td>${row.updated_at ?? ""}</td>
-        <td>
-          <button class="btn btn-sm btn-outline-warning" onclick="editTable('${id}')"><i class="bi bi-pencil"></i></button>
-          <button class="btn btn-sm btn-outline-danger" onclick="deleteTable('${id}')"><i class="bi bi-trash"></i></button>
-        </td>
-      `;
-    // Додаємо стилі курсора та обробник кліку
-    tr.style.cursor = "pointer";
-    tr.addEventListener("click", (e) => {
-      // Не реагувати, якщо клік по кнопці редагування/видалення
-      if (
-        e.target.closest("button") ||
-        e.target.tagName === "BUTTON" ||
-        e.target.closest("img")
-      )
-        return;
-      openTable(row.tableName || row.name || row.id);
-    });
-    tableBody.appendChild(tr);
-  });
-
-  renderPagination(totalPages, page);
 }
 
 // Створення пагінації
@@ -110,9 +119,9 @@ async function editTable(id) {
 
   // Заповнити поля форми
   document.getElementById("form__table-name").value = row.tableName || "";
+  document.getElementById("form__description").value = row.tableName || "";
   document.getElementById("form__faculty-name").value = row.faculty || "";
-  document.getElementById("form__specialty-code").value =
-    row.speciality_code || "";
+  document.getElementById("form__specialty-code").value = row.speciality_code || "";
   document.getElementById("form__department-name").value = row.department || "";
   document.getElementById("form__group-count").value = row.groups_count || "";
   document.getElementById("form__entry-year").value = row.entry_year || "";
@@ -121,14 +130,29 @@ async function editTable(id) {
 }
 
 // Видалення таблиці
-async function deleteTable(id) {
-  if (!confirm("Ви впевнені, що хочете видалити цю таблицю?")) return;
+async function deleteTable(id, name) {
+  const displayName = name && name.trim() !== " " ? name: `з ID ${id}`;
 
-  const res = await fetch(`/api/meta_tables/${id}`, { method: "DELETE" });
-  if (res.ok) {
-    await loadTables(1);
-  } else {
-    alert("Помилка видалення!");
+  if (!confirm(`Ви впевнені, що хочете видалити таблицю "${displayName}"?\nУсі дані студентів, звіти та файли, прив'язані до неї, будуть безповоротно видалені!`)) {
+     return;
+  }
+
+  try{
+    const res = await fetch(`/api/meta_tables/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      alert("Таблицю успішно видалено!");
+      await loadTables(1);
+    } else {
+      const text = await res.text();
+      try {
+        const err = JSON.parse(text);
+        alert(err.error || "Помилка видалення");
+      }catch(e) {
+        alert("Помилка сервера: " + text);
+      }
+    }
+  }catch (err) {
+        alert("Помилка підключення до сервера");
   }
 }
 
@@ -151,6 +175,7 @@ if (tableForm) {
     e.preventDefault();
 
     const tableName = document.getElementById("form__table-name").value.trim();
+    const descriptionField = document.getElementById("form__description").value.trim();
     const faculty = document.getElementById("form__faculty-name").value.trim();
     const speciality_code = document
       .getElementById("form__specialty-code")

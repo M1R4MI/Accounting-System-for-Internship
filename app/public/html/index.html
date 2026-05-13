@@ -38,7 +38,7 @@
 
           <!-- Імпорт самої таблиці -->
           <input type="file" id="container__file-input" class="d-none" accept=".csv,.xlsx,.xls" />
-          <button class="btn btn-secondary" onclick="document.getElementById('container__file-input').click()">
+          <button class="btn btn-secondary" id="container__file-import">
             <i class="bi bi-table"></i> Імпорт таблиці
           </button>
 
@@ -69,16 +69,13 @@
       </div>
 
       <!-- Пагінація -->
-      <nav class="mt-3">
-        <ul class="pagination justify-content-center">
-          <li class="page-item disabled"><a class="page-link">Попередня</a></li>
-          <li class="page-item active"><a class="page-link" href="#">1</a></li>
-          <li class="page-item"><a class="page-link" href="#">Наступна</a></li>
+      <nav class="mt-3" id="pagination-nav" style="display: none;">
+        <ul class="pagination justify-content-center" id="pagination">
         </ul>
       </nav>
     </div>
 
-    <!-- Модальне вікно Авторизації (Нове) -->
+    <!-- Модальне вікно Авторизації -->
     <div class="modal fade" id="authModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
         <div class="modal-dialog">
           <div class="modal-content">
@@ -144,9 +141,13 @@
             </div>
             <div class="modal-body">
               <div class="row g-3">
-                <div class="col-md-6">
-                  <label class="form-label">Назва таблиці</label>
+                <div class="col-md-12">
+                  <label class="form-label" for="form__table-name">Системна назва таблиці (англ. літерами, напр. practice_2026)</label>
                   <input type="text" class="form-control" id="form__table-name" required />
+                </div>
+                <div class="col-md-12">
+                  <label class="form-label" for="form__description">Опис (Назва для відображення)</label>
+                  <input type="text" class="form-control" id="form__description" placeholder="Наприклад: Виробнича практика ПІ-22" required />
                 </div>
                 <div class="col-md-6">
                   <label class="form-label">Факультет</label>
@@ -187,24 +188,32 @@
     <script>
         // Глобальний перехоплювач fetch, щоб автоматично додавати токен до всіх ваших існуючих запитів у index.js
         const originalFetch = window.fetch;
-        window.fetch = async function() {
-            let [resource, config] = arguments;
+        window.fetch = async function(resource, config = {}) {
             const token = localStorage.getItem('jwt_token');
             
             // Додаємо токен, якщо він є і це запит на наш API
-            if(token && resource.includes('/api/') || resource.includes('/upload')) {
-                config = config || {};
+            if(token && typeof resource === 'string'
+               && (resource.includes('/api/')
+               || resource.includes('/upload') || resource.includes('/create-table')) &&
+              !resource.includes('/auth/')) {
+                
                 config.headers = config.headers || {};
                 // Якщо FormData, не встановлюємо Content-Type руками, але додаємо Authorization
-                config.headers['Authorization'] = `Bearer ${token}`;
+                if(config.headers instanceof Headers) {
+                  config.headers.set(['Authorization'], `Bearer ${token}`);
+                }else {
+                  config.headers['Authorization'] = `Bearer ${token}`;
+                }
             }
             
             const response = await originalFetch(resource, config);
             
             // Якщо сервер каже, що токен прострочений або відсутній
-            if(response.status === 401 || response.status === 403) {
+            if(response.status === 401 && typeof resource === 'string' && !resource.includes('/auth/')) {
                 localStorage.removeItem('jwt_token');
-                checkAuth();
+                if(typeof checkAuth === "function") {
+                  checkAuth();
+                }
             }
             return response;
         };

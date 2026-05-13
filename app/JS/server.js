@@ -11,11 +11,12 @@ const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const PDFDocument = require('pdfkit');
 const { error } = require("console");
 const dateTime = auxiliary.getDateTime();
 
 const app = express();
-const upload = multer({ 
+const upload = multer({
     dest: path.join(__dirname, "uploads/"),
     limits: {fileSize: 10 * 1024 * 1024} //10 MB
  });
@@ -25,10 +26,10 @@ const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_internship_key';
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  if(!token) return res.status(401).json({error: "Неправильний токен"});
+  if(!token) return res.status(401).json({error: "Доступ заборонено (відсутній токен)"});
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
-    if(err) return res.status(403).json({error: "Недійсний токен"});
+    if(err) return res.status(401).json({error: "Недійсний або прострочений токен. Увійдіть знову."});
     req.user = user;
     next();
   });
@@ -142,7 +143,7 @@ const authenticateToken = (req, res, next) => {
         const limit = parseInt(req.query.limit) || 10;
         const offset = (page - 1) * limit;
 
-        let queryStr = `SELECT id, tableName AS name, faculty, speciality_code, created_at, updated_at FROM meta_tables`;
+        let queryStr = `SELECT id, tableName, descriptionField AS name, faculty, speciality_code, created_at, updated_at FROM meta_tables`;
         let countQueryStr = `SELECT COUNT(*) AS total FROM meta_tables`;
         let queryParams = [];
 
@@ -192,36 +193,35 @@ const authenticateToken = (req, res, next) => {
     // Створення нової таблиці (з прив'язкою до викладача)
     app.post("/create-table", authenticateToken, async (req, res) => {
       try {
-        const { tableName, faculty, speciality_code, department, groups_count, entry_year } = req.body;
-        const teacherId = req.user.id; // Отримуємо ID викладача з токена
+        const { tableName, descriptionField, faculty, speciality_code, department, groups_count, entry_year } = req.body; // Залишаємо тільки назву і опис
+        const teacherId = req.user.id;
 
         if (!tableName || !/^[a-zA-Z0-9_]+$/.test(tableName)) {
           return res.status(400).json({ error: "Неправильна назва таблиці" });
         }
 
+        // ОНОВЛЕНА СТРУКТУРА ДИНАМІЧНОЇ ТАБЛИЦІ
         const createTableSql = `
           CREATE TABLE IF NOT EXISTS \`${tableName}\`(
             ID INT auto_increment primary key,
+            student_id INT NOT NULL,
             RegistrationNumber varchar(30),
-            StudentName varchar(255),
-            StudentGroup varchar(30),
             RegistrationDate DATE,
             Information varchar(500),
             Contact varchar(255),
             DocumentType varchar(30),
             SigningStatus varchar(30),
-            OccupationalSafety varchar(30)
+            OccupationalSafety varchar(30),
+            FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
           );
         `;
         await db.query(createTableSql);
 
         const insertMetaSql = `
-          INSERT INTO meta_tables (teacher_id, tableName, faculty, speciality_code, department, groups_count, entry_year, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO meta_tables (teacher_id, tableName, descriptionField, faculty, speciality_code, department, groups_count, entry_year, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
-        await db.query(insertMetaSql, [
-          teacherId, tableName, faculty, speciality_code, department, groups_count, entry_year, dateTime, dateTime
-        ]);
+        await db.query(insertMetaSql, [teacherId, tableName, descriptionField, faculty, speciality_code, department, groups_count, entry_year, dateTime, dateTime]);
 
         res.json({ message: `Таблиця ${tableName} створена` });
       } catch (err) {
@@ -233,15 +233,18 @@ const authenticateToken = (req, res, next) => {
     app.put("/api/meta_tables/:id", authenticateToken, async (req, res) => {
       try {
         const { id } = req.params;
-        const { tableName, faculty, speciality_code, department, groups_count, entry_year } = req.body;
+        const { tableName, descriptionField, faculty, speciality_code, department, groups_count, entry_year } = req.body;
         if (!tableName) return res.status(400).json({ error: "Введіть назву таблиці" });
 
         // Перевіряємо стару таблицю і права доступу
         const [oldRows] = await db.query("SELECT tableName, teacher_id FROM meta_tables WHERE id = ?", [id]);
         if (!oldRows.length) return res.status(404).json({ error: "Таблицю не знайдено" });
+
+        const ownerId = oldRows[0].teacherId;
+        const userId = req.user.id;
         
-        if (oldRows[0].teacher_id !== req.user.id && req.user.role !== 'admin') {
-            return res.status(403).json({ error: "Доступ заборонено. Це не ваша таблиця." });
+        if(ownerId != null && ownerId != userId && req.user.role !== 'admin') {
+          return res.status(403).json({error: "Доступ заборонено."});
         }
 
         const oldTableName = oldRows[0].tableName;
@@ -252,8 +255,8 @@ const authenticateToken = (req, res, next) => {
         }
 
         await db.query(
-          `UPDATE meta_tables SET tableName=?, faculty=?, speciality_code=?, department=?, groups_count=?, entry_year=?, updated_at=? WHERE id=?`,
-          [tableName, faculty, speciality_code, department, groups_count, entry_year, dateTime, id]
+          `UPDATE meta_tables SET tableName=?, descriptionField=?, faculty=?, speciality_code=?, department=?, groups_count=?, entry_year=?, updated_at=? WHERE id=?`,
+          [tableName, descriptionField, faculty, speciality_code, department, groups_count, entry_year, dateTime, id]
         );
         res.json({ message: "Дані таблиці оновлено" });
       } catch (err) {
@@ -261,20 +264,46 @@ const authenticateToken = (req, res, next) => {
       }
     });
 
-    // Видалення мета-таблиці
+    // Видалення таблиці
     app.delete("/api/meta_tables/:id", authenticateToken, async (req, res) => {
       try {
-        const [table] = await db.query("SELECT teacher_id FROM meta_tables WHERE id = ?", [req.params.id]);
-        if (!table.length) return res.status(404).json({ error: "Таблицю не знайдено" });
-
-        if (table[0].teacher_id !== req.user.id && req.user.role !== 'admin') {
-            return res.status(403).json({ error: "Доступ заборонено" });
+        // 1. Отримуємо дані про таблицю з БД (змінна називається table, а не oldRows)
+        const [table] = await db.query("SELECT teacher_id, tableName FROM meta_tables WHERE id = ?", [req.params.id]);
+        
+        if (!table.length) {
+            return res.status(404).json({ error: "Таблицю не знайдено" });
         }
 
+        // Зчитуємо дані таблиці та користувача
+        const ownerId = table[0].teacher_id;
+        const tableName = table[0].tableName;
+        
+        const userId = req.user.id;
+        const userRole = req.user.role;
+
+        // 2. Надійна перевірка прав
+        if (ownerId != null && ownerId != userId && userRole !== 'admin') {
+            return res.status(403).json({ error: "Доступ заборонено. Це не ваша таблиця." });
+        }
+
+        // 3. Видаляємо фізичну таблицю з бази даних, якщо в неї є ім'я
+        if (tableName && tableName.trim() !== '') {
+            try {
+                await db.query(`DROP TABLE IF EXISTS \`${tableName}\``);
+            } catch (dropErr) {
+                console.error("Не вдалося видалити фізичну таблицю:", dropErr);
+                // Продовжуємо навіть якщо фізичної таблиці немає
+            }
+        }
+
+        // 4. Видаляємо запис з реєстру (meta_tables)
         await db.query(`DELETE FROM meta_tables WHERE id = ?`, [req.params.id]);
-        res.sendStatus(200);
+        
+        // Відправляємо успішний результат
+        res.json({ message: "Успішно видалено" });
       } catch (err) {
-        res.status(500).json(err);
+        console.error("Помилка сервера при видаленні:", err);
+        res.status(500).json({ error: err.message || "Внутрішня помилка сервера" });
       }
     });
 
@@ -357,30 +386,87 @@ const authenticateToken = (req, res, next) => {
         if (!req.file) return res.status(400).json({ error: 'Файл не знайдено' });
         try {
             const workbook = xlsx.readFile(req.file.path);
-            const data = xlsx.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-            let count = 0;
+            const sheetName = workbook.SheetNames[0];
+            // Зчитуємо дані. defval: "" запобігає втраті порожніх комірок
+            const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "" });
+            
+            if (data.length === 0) {
+                 fs.unlinkSync(req.file.path);
+                 return res.status(400).json({ error: "Файл порожній або дані відсутні." });
+            }
+
+            // Динамічний пошук колонок (ігнорує пробіли та регістр)
+            const keys = Object.keys(data[0]);
+            const pibKey = keys.find(k => k.toLowerCase().includes('піб') || k.toLowerCase().includes('п.і.б') || k.toLowerCase().includes('імя'));
+            const groupKey = keys.find(k => k.toLowerCase().includes('груп'));
+            const bookKey = keys.find(k => k.toLowerCase().includes('залік'));
+
+            if (!pibKey || !groupKey) {
+                fs.unlinkSync(req.file.path);
+                return res.status(400).json({ error: "Не знайдено обов'язкові колонки (ПІБ, Група). Перевірте заголовки в файлі." });
+            }
+
+            let studentsAdded = 0;
+            let groupsAdded = 0;
+
             for (const row of data) {
-                if (row['ПІБ'] && row['Заліковка'] && row['Група']) {
-                    const [result] = await db.query(
-                        'INSERT IGNORE INTO students_dictionary (full_name, record_book_number, group_name) VALUES (?, ?, ?)',
-                        [row['ПІБ'], row['Заліковка'], row['Група']]
+                const fullName = row[pibKey] ? String(row[pibKey]).trim() : null;
+                const groupName = row[groupKey] ? String(row[groupKey]).trim() : null;
+                const recordBook = bookKey && row[bookKey] ? String(row[bookKey]).trim() : null;
+
+                if (fullName && groupName) {
+                    // 1. Знаходимо або створюємо групу
+                    let groupId;
+                    const [existingGroup] = await db.query('SELECT id FROM student_groups WHERE group_name = ?', [groupName]);
+                    
+                    if (existingGroup.length > 0) {
+                        groupId = existingGroup[0].id;
+                    } else {
+                        const [newGroupResult] = await db.query('INSERT INTO student_groups (group_name) VALUES (?)', [groupName]);
+                        groupId = newGroupResult.insertId;
+                        groupsAdded++;
+                    }
+
+                    // 2. Додаємо студента
+                    const [studentResult] = await db.query(
+                        'INSERT IGNORE INTO students (full_name, record_book_number, group_id) VALUES (?, ?, ?)',
+                        [fullName, recordBook, groupId]
                     );
-                    if (result.affectedRows > 0) count++;
+
+                    if (studentResult.affectedRows > 0) {
+                        studentsAdded++;
+                    }
                 }
             }
+
             fs.unlinkSync(req.file.path);
-            res.json({ message: `Успішно імпортовано ${count} студентів у довідник` });
+            
+            // Чітке повідомлення без припущень
+            if (studentsAdded === 0 && groupsAdded === 0) {
+                 res.json({ message: "Дані не додано. Перевірте формат файлу." });
+            } else {
+                 res.json({ message: `Успішно оброблено! Додано студентів: ${studentsAdded}, нових груп: ${groupsAdded}` });
+            }
+
         } catch (err) {
+            console.error("Помилка імпорту:", err);
             if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-            res.status(500).json({ error: 'Помилка обробки файлу' });
+            res.status(500).json({ error: 'Помилка при зчитуванні файлу. Перевірте формат.' });
         }
     });
 
     app.get('/api/students/dictionary', authenticateToken, async (req, res) => {
         try {
-            const [students] = await db.query('SELECT * FROM students_dictionary ORDER BY group_name, full_name');
+            // Робимо JOIN щоб отримати ім'я групи
+            const [students] = await db.query(`
+                SELECT s.id, s.full_name, s.record_book_number, sg.group_name 
+                FROM students s
+                JOIN student_groups sg ON s.group_id = sg.id
+                ORDER BY sg.group_name, s.full_name
+            `);
             res.json(students);
         } catch (err) {
+            console.error("Помилка довідника:", err);
             res.status(500).json({ error: 'Помилка отримання довідника' });
         }
     });
@@ -401,7 +487,7 @@ const authenticateToken = (req, res, next) => {
         }
     });
 
-     app.get('/api/documents/:tableName/:rowId', authenticateToken, async (req, res) => {
+    app.get('/api/documents/:tableName/:rowId', authenticateToken, async (req, res) => {
         try {
             const [docs] = await db.query(
                 'SELECT id, document_type, file_path, original_name, uploaded_at FROM documents WHERE table_name = ? AND row_id = ?',
@@ -416,42 +502,26 @@ const authenticateToken = (req, res, next) => {
     // Отримати всі рядки таблиці
     app.get("/api/table/:tableName", authenticateToken, async (req, res) => {
       try {
-        const tableName = req.params.tableName;
-        if (!tableName || !/^[a-zA-Z0-9_]+$/.test(tableName)) {
-          return res.status(400).json({ error: "Неправильна назва таблиці" });
-        }
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 1000;
-        const result = await getDataWithPagination(tableName, page, limit);
-        // Якщо таблиця стандартна (має всі стандартні поля) — форматувати registrationDate
-        const standardKeys = [
-          "ID",
-          "RegistrationNumber",
-          "StudentName",
-          "StudentGroup",
-          "RegistrationDate",
-          "Information",
-          "Contact",
-          "DocumentType",
-          "SigningStatus",
-          "OccupationalSafety",
-        ];
-        const isStandard =
-          result.data.length > 0 &&
-          standardKeys.every((k) => Object.keys(result.data[0]).includes(k)) &&
-          Object.keys(result.data[0]).length === standardKeys.length;
-        if (isStandard) {
-          result.data = result.data.map((row) => ({
-            ...row,
-            RegistrationDate: row["RegistrationDate"]
-              ? dateFormat(row["RegistrationDate"]).format("DD-MM-YYYY")
-              : null,
-          }));
-        }
-        res.json(result.data);
+          const tableName = req.params.tableName;
+          if (!/^[a-zA-Z0-9_]+$/.test(tableName)) return res.status(400).json({error: "Невірна назва таблиці"});
+          
+          // Робимо правильний JOIN з новими таблицями students та student_groups
+          const [rows] = await db.query(`
+              SELECT t.ID, t.student_id, 
+                    s.record_book_number AS RegistrationNumber, 
+                    DATE_FORMAT(t.RegistrationDate, '%Y-%m-%d') AS RegistrationDate, 
+                    s.full_name AS StudentName, 
+                    sg.group_name AS StudentGroup, 
+                    t.Information, t.Contact, t.DocumentType, t.SigningStatus, t.OccupationalSafety
+              FROM \`${tableName}\` t
+              JOIN students s ON t.student_id = s.id
+              JOIN student_groups sg ON s.group_id = sg.id
+              ORDER BY t.ID DESC
+          `);
+          res.json(rows);
       } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Помилка при завантаженні даних" });
+          console.error("Помилка завантаження таблиці:", err);
+          res.status(500).json({ error: "Помилка завантаження даних" });
       }
     });
 
@@ -476,35 +546,23 @@ const authenticateToken = (req, res, next) => {
     // Додати рядок у таблицю
     app.post("/api/table/:tableName", authenticateToken, async (req, res) => {
       try {
-        const tableName = req.params.tableName;
-        const data = req.body;
-        if (!tableName || !/^[a-zA-Z0-9_]+$/.test(tableName)) {
-          return res.status(400).json({ error: "Неправильна назва таблиці" });
-        }
-        // Генерація номера якщо треба
-        if (data.StudentName && !data.RegistrationNumber) {
-          data.RegistrationNumber = await auxiliary.generateRegistrationNumber(
-            tableName,
-            "08-32",
-            db
-          );
-        }
-        // Build INSERT query with proper placeholders
-        const columns = Object.keys(data);
-        const values = Object.values(data);
-        const placeholders = columns.map(() => "?").join(", ");
-        const columnsList = columns.map((col) => `\`${col}\``).join(", ");
+          const tableName = req.params.tableName;
+          if (!/^[a-zA-Z0-9_]+$/.test(tableName)) return res.status(400).json({error: "Невірна назва таблиці"});
+          
+          const {  student_id, RegistrationDate, Information, Contact, DocumentType, SigningStatus, OccupationalSafety } = req.body;
+          
+          if (!student_id) return res.status(400).json({error: "Не обрано студента"});
 
-        const [result] = await db.query(
-          `INSERT INTO \`${tableName}\` (${columnsList}) VALUES (${placeholders})`,
-          values
-        );
-        res.json({ id: result.insertId });
+          const sql = `INSERT INTO \`${tableName}\` 
+              (student_id, RegistrationDate, Information, Contact, DocumentType, SigningStatus, OccupationalSafety) 
+              VALUES (?, ?, ?, ?, ?, ?, ?)`;
+          
+          await db.query(sql, [student_id, RegistrationDate, Information, Contact, DocumentType, SigningStatus, OccupationalSafety]);
+          
+          res.json({ message: "Успішно додано" });
       } catch (err) {
-        console.error("Error in POST /api/table/:tableName:", err);
-        res
-          .status(500)
-          .json({ error: "Internal Server Error", details: err.message });
+          console.error("Помилка збереження запису:", err);
+          res.status(500).json({ error: "Помилка збереження в БД" });
       }
     });
 
@@ -631,37 +689,40 @@ const authenticateToken = (req, res, next) => {
     //--HTTP edit row in table method--
     // Оновлення рядка
     app.put("/api/table/:tableName/:id", authenticateToken, async (req, res) => {
-      const tableName = req.params.tableName;
-      const id = req.params.id;
-      const data = req.body;
-      try {
-        // Build UPDATE query with proper placeholders
-        const columns = Object.keys(data).map((col) => `\`${col}\` = ?`);
-        const values = Object.values(data);
-        const set = columns.join(", ");
+        try {
+            const { tableName, id } = req.params;
+            if (!/^[a-zA-Z0-9_]+$/.test(tableName)) return res.status(400).json({error: "Невірна назва таблиці"});
+            
+            const { student_id, RegistrationDate, Information, Contact, DocumentType, SigningStatus, OccupationalSafety } = req.body;
+            
+            if (!student_id) return res.status(400).json({error: "Не обрано студента"});
 
-        await db.query(
-          `UPDATE \`${tableName}\` SET ${set} WHERE id = ?`,
-          [...values, id]
-        );
-        res.json({ message: "Row updated successfully" });
-      } catch (err) {
-        console.error("Update error:", err);
-        res.status(500).json({ error: err.message });
-      }
+            const sql = `UPDATE \`${tableName}\` SET 
+                student_id=?, RegistrationDate=?, Information=?, Contact=?, DocumentType=?, SigningStatus=?, OccupationalSafety=? 
+                WHERE ID=?`;
+            
+            await db.query(sql, [student_id, RegistrationDate, Information, Contact, DocumentType, SigningStatus, OccupationalSafety, id]);
+            
+            res.json({ message: "Успішно оновлено" });
+        } catch (err) {
+            console.error("Помилка оновлення запису:", err);
+            res.status(500).json({ error: "Помилка оновлення" });
+        }
     });
 
     //--HTTP delete row in table method--
     // Видалення рядка
     app.delete("/api/table/:tableName/:id", authenticateToken, async (req, res) => {
-      const tableName = req.params.tableName;
-      const id = req.params.id;
-      try {
-        await db.query(`DELETE FROM ${tableName} WHERE id = ?`, [id]);
-        res.sendStatus(200);
-      } catch (err) {
-        res.status(500).json(err);
-      }
+        try {
+            const { tableName, id } = req.params;
+            if (!/^[a-zA-Z0-9_]+$/.test(tableName)) return res.status(400).json({error: "Невірна назва таблиці"});
+            
+            await db.query(`DELETE FROM \`${tableName}\` WHERE ID=?`, [id]);
+            res.json({ message: "Успішно видалено" });
+        } catch (err) {
+            console.error("Помилка видалення:", err);
+            res.status(500).json({ error: "Помилка видалення" });
+        }
     });
 
     // Endpoint: отримати назви стовпців і коментарі для таблиці(потрібно для створення кастомних таблиць, які були імпортовані і не мають стандартних стовпців)
@@ -689,9 +750,30 @@ const authenticateToken = (req, res, next) => {
       if (!/^[a-zA-Z0-9_]+$/.test(tableName)) throw new Error("Invalid table name");
       
       const tableId = `\`${tableName}\``;
-      const [rows] = await db.query(`SELECT * FROM ${tableId} LIMIT ? OFFSET ?`, [limit, offset]);
-      const [countRows] = await db.query(`SELECT COUNT(*) AS total FROM ${tableId}`);
+      let rows = [];
       
+      if (tableName === "meta_tables") {
+        // Оновлений запит для meta_tables
+        const [r] = await db.query(
+          `SELECT id, tableName AS name, descriptionField, created_at, updated_at FROM ${tableId} LIMIT ? OFFSET ?`,
+          [limit, offset]
+        );
+        rows = r;
+      } else {
+        // ОНОВЛЕНИЙ ЗАПИТ: Об'єднуємо динамічну таблицю з довідником студентів
+        const [r] = await db.query(
+          `SELECT t.ID, t.student_id, sd.record_book_number AS RegistrationNumber, 
+                  t.RegistrationDate, sd.full_name AS StudentName, sd.group_name AS StudentGroup, 
+                  t.Information, t.Contact, t.DocumentType, t.SigningStatus, t.OccupationalSafety
+          FROM ${tableId} t
+          JOIN students_dictionary sd ON t.student_id = sd.id
+          LIMIT ? OFFSET ?`,
+          [limit, offset]
+        );
+        rows = r;
+      }
+
+      const [countRows] = await db.query(`SELECT COUNT(*) AS total FROM ${tableId}`);
       return {
         data: rows,
         total: (countRows && countRows[0] && countRows[0].total) || 0,

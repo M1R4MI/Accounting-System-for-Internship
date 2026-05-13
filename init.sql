@@ -52,9 +52,10 @@ CREATE TABLE IF NOT EXISTS meta_tables (
     id INT AUTO_INCREMENT PRIMARY KEY,
     teacher_id INT NULL, -- Зв'язок з користувачем, який створив таблицю
     tableName VARCHAR(255) NOT NULL,
-    faculty VARCHAR(255),
-    speciality_code VARCHAR(50),
-    department VARCHAR(255),
+    descriptionField varchar(255),
+    faculty varchar(120),
+    speciality_code varchar(10),
+    department varchar(80),
     groups_count INT,
     entry_year INT,
     created_at varchar(32) NOT NULL,
@@ -73,5 +74,5 @@ CREATE TABLE IF NOT EXISTS documents (
     original_name VARCHAR(255) NOT NULL,
     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
-    FOREIGN KEY (registry_id) REFERENCES practice_tables_registry(id) ON DELETE CASCADE
+    FOREIGN KEY (registry_id) REFERENCES meta_tables(id) ON DELETE CASCADE
 );
