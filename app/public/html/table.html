@@ -35,9 +35,16 @@
             </button>
 
             <!-- Пошук (тепер стандартної висоти Bootstrap) -->
-            <div class="input-group" style="width: 250px;">
-                <input type="text" id="searchInput" class="form-control" placeholder="Пошук..." />
-                <button class="btn btn-primary d-flex align-items-center" onclick="searchInTable()"><i class="bi bi-search"></i></button>
+            <div style="display: flex; align-items: stretch; width: 250px;">
+                
+                <input type="text" id="searchInput" class="form-control" placeholder="Пошук..." 
+                      style="border-top-right-radius: 0; border-bottom-right-radius: 0; margin: 0; box-shadow: none; z-index: 1;">
+                      
+                <button class="btn btn-primary" type="button" onclick="searchInTable()" 
+                        style="border-top-left-radius: 0; border-bottom-left-radius: 0; margin: 0; margin-left: -1px; display: flex; align-items: center; justify-content: center; z-index: 2;">
+                    <i class="bi bi-search"></i>
+                </button>
+                
             </div>
 
             <!-- Фільтри -->
@@ -57,10 +64,6 @@
             <!-- Експорт Excel -->
             <button class="btn btn-outline-success d-flex align-items-center" id="exportBtn">
                 <i class="bi bi-file-earmark-excel me-1"></i> Excel
-            </button>
-            <!-- Експорт PDF -->
-            <button class="btn btn-outline-danger d-flex align-items-center" id="exportPdfBtn" onclick="exportPdf()">
-                <i class="bi bi-file-earmark-pdf me-1"></i> PDF
             </button>
         </div>
       </div>
@@ -269,97 +272,12 @@
 
     <!-- Скрипти: Авторизація, PDF, та "розумний" список студентів -->
     <script>
-        const originalFetch = window.fetch;
-        window.fetch = async function(resource, config = {}) {
-            const token = localStorage.getItem('jwt_token');
-            if(!token) { window.location.href = '/'; return; }
-            
-            if (typeof resource === 'string' && (resource.includes('/api/') || resource.includes('/upload')) && !resource.includes('/auth/')) {
-                config.headers = config.headers || {};
-                if (!(config.body instanceof FormData)) { config.headers['Content-Type'] = config.headers['Content-Type'] || 'application/json'; }
-                
-                if (config.headers instanceof Headers) { config.headers.set('Authorization', `Bearer ${token}`); } 
-                else { config.headers['Authorization'] = `Bearer ${token}`; }
-            }
-            
-            const response = await originalFetch(resource, config);
-            if(response.status === 401 && typeof resource === 'string' && !resource.includes('/auth/')) {
-                localStorage.removeItem('jwt_token');
-                window.location.href = '/';
-            }
-            return response;
-        };
-
-        function logout() {
-            localStorage.removeItem('jwt_token');
-            window.location.href = '/';
-        }
-
-        function exportPdf() {
-            fetch(`/api/table/${tableName}/export-pdf`)
-            .then(res => res.blob())
-            .then(blob => {
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${tableName}_звіт.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-            });
-        }
-
         const docsModal = new bootstrap.Modal(document.getElementById('docsModal'));
         window.openDocsModal = async function(rowId) {
             document.getElementById('docRowId').value = rowId;
             await loadDocuments(rowId);
             docsModal.show();
         }
-
-        async function loadDocuments(rowId) {
-            const list = document.getElementById('uploadedDocsList');
-            list.innerHTML = '<li class="list-group-item text-center">Завантаження...</li>';
-            try {
-                const res = await fetch(`/api/documents/${tableName}/${rowId}`);
-                const docs = await res.json();
-                list.innerHTML = '';
-                if(docs.length === 0) {
-                    list.innerHTML = '<li class="list-group-item text-muted">Немає завантажених файлів</li>';
-                    return;
-                }
-                docs.forEach(doc => {
-                    list.innerHTML += `
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <div>
-                                <span class="badge bg-secondary me-2">${doc.document_type}</span>
-                                <a href="${doc.file_path}" target="_blank">${doc.original_name}</a>
-                            </div>
-                        </li>
-                    `;
-                });
-            } catch (err) { console.error(err); }
-        }
-
-        document.getElementById('uploadDocForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData();
-            formData.append('table_name', tableName);
-            formData.append('row_id', document.getElementById('docRowId').value);
-            formData.append('document_type', document.getElementById('uploadDocType').value);
-            formData.append('document', document.getElementById('uploadFile').files[0]);
-
-            const btn = e.target.querySelector('button');
-            btn.disabled = true; btn.innerText = 'Завантаження...';
-            try {
-                const res = await fetch('/api/documents/upload', { method: 'POST', body: formData });
-                if(res.ok) {
-                    alert('Файл успішно завантажено');
-                    e.target.reset();
-                    loadDocuments(document.getElementById('docRowId').value);
-                } else { alert((await res.json()).error || 'Помилка'); }
-            } catch (err) { alert('Помилка сервера'); }
-            finally { btn.disabled = false; btn.innerText = 'Завантажити на сервер'; }
-        });
 
         // ==========================================
         // ЛОГІКА "РОЗУМНОГО" СПИСКУ СТУДЕНТІВ

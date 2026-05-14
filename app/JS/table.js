@@ -19,6 +19,7 @@ function table(data) {
     tr.innerHTML = `
       <td>${row.ID ?? ""}</td>
       <td>${row.RegistrationNumber ?? ""}</td>
+      <td>${row.record_book_number ?? ""}</td>
       <td>${row.RegistrationDate ?? ""}</td>
       <td>${row.StudentName ?? ""}</td>
       <td>${row.StudentGroup ?? ""}</td>
@@ -33,6 +34,9 @@ function table(data) {
         </button>
       </td>
       <td style='white-space: nowrap;'>
+        <button class="btn btn-sm btn-outline-secondary me-1" onclick="cloneRecord(${row.ID})" title="Клонувати запис">
+            <i class="bi bi-files"></i>
+        </button>
         <button class="btn btn-outline-primary btn-sm me-1" title="Редагувати" onclick='editRow(${JSON.stringify(row).replace(/"/g, "&quot;")})'>
           <i class="bi bi-pencil"></i>
         </button>
@@ -88,6 +92,34 @@ async function editRow(row) {
   
   const editModal = new bootstrap.Modal(document.getElementById("editModal"));
   editModal.show();
+}
+
+// Функція клонування запису
+async function cloneRecord(id) {
+    if (!confirm("Ви впевнені, що хочете клонувати цей запис?\n\n(Файли та документи оригінального запису скопійовані НЕ будуть)")) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/table/${tableName}/clone/${id}`, {
+            method: "POST"
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            // Перезавантажуємо таблицю, щоб побачити новий запис
+            await loadTable(); // Або ваша функція оновлення даних таблиці (наприклад, searchTable(""))
+            
+            // Маленька підказка користувачу
+            alert(`Успіх! Запис клоновано.\nНовий реєстраційний номер: ${data.RegistrationNumber}\n\nТепер натисніть "Редагувати" (олівець) на новому записі, щоб змінити студента.`);
+        } else {
+            alert("Помилка клонування: " + data.error);
+        }
+    } catch (error) {
+        console.error("Помилка клонування:", error);
+        alert("Не вдалося з'єднатися з сервером.");
+    }
 }
 
 // Видалення рядка
@@ -174,13 +206,13 @@ if (editForm) {
     
     // Збираємо дані, надсилаючи student_id замість тексту
     const data = {
-      student_id: document.getElementById("edit_student_id").value,
+      student_id: document.getElementById("editStudentId").value,
       RegistrationDate: document.getElementById("editRegistrationDate").value,
       Information: document.getElementById("editInformation").value,
       Contact: document.getElementById("editContact").value,
       DocumentType: document.getElementById("editDocumentType").value,
       SigningStatus: document.getElementById("editSigningStatus").value,
-      OccupationalSafety: document.getElementById("editOccupationalSafety").value,
+      OccupationalSafety: document.getElementById("editOp").value,
     };
 
     try {
@@ -210,13 +242,13 @@ if (addForm) {
     
     // Збираємо дані для нової структури БД
     const data = {
-      student_id: document.getElementById("student_id").value,
-      RegistrationDate: document.getElementById("RegistrationDate").value,
-      Information: document.getElementById("Information").value,
-      Contact: document.getElementById("Contact").value,
-      DocumentType: document.getElementById("DocumentType").value,
-      SigningStatus: document.getElementById("SigningStatus").value,
-      OccupationalSafety: document.getElementById("OccupationalSafety").value,
+      student_id: document.getElementById("studentId").value,
+      RegistrationDate: document.getElementById("registrationDate").value,
+      Information: document.getElementById("information").value,
+      Contact: document.getElementById("contact").value,
+      DocumentType: document.getElementById("documentType").value,
+      SigningStatus: document.getElementById("signingStatus").value,
+      OccupationalSafety: document.getElementById("op").value,
     };
 
     try {
@@ -243,6 +275,150 @@ if (addForm) {
 const exportBtn = document.getElementById("exportBtn");
 if (exportBtn) {
   exportBtn.addEventListener("click", () => exportTable(tableName));
+}
+
+async function openDocsModal(recordId) {
+    // 1. Зберігаємо ID рядка у приховане поле
+    document.getElementById("docRowId").value = recordId;
+    
+    // 2. Очищаємо список та інпут перед завантаженням
+    document.getElementById("uploadedDocsList").innerHTML = "";
+    document.getElementById("uploadFile").value = "";
+    
+    // 3. Завантажуємо список вже існуючих файлів
+    await loadUploadedDocs(recordId);
+    
+    // 4. Відкриваємо модалку
+    const modal = new bootstrap.Modal(document.getElementById('docsModal'));
+    modal.show();
+}
+
+// Завантаження списку файлів
+async function loadUploadedDocs(recordId) {
+    const list = document.getElementById("uploadedDocsList");
+    try {
+        const res = await fetch(`/api/documents/${encodeURIComponent(tableName)}/${recordId}`);
+        const data = await res.json();
+
+        list.innerHTML = "";
+        if (!res.ok) throw new Error(data.error);
+
+        if (data.length === 0) {
+            list.innerHTML = '<li class="list-group-item text-center text-muted">Файлів немає</li>';
+            return;
+        }
+
+        data.forEach(doc => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item d-flex justify-content-between align-items-center';
+            
+            // НОВІ ПОСИЛАННЯ (звертаємось до нашого нового API)
+            const viewUrl = `/api/documents/download/${doc.id}?action=view`;
+            const downloadUrl = `/api/documents/download/${doc.id}?action=download`;
+            
+            const isPdf = doc.original_name.toLowerCase().endsWith('.pdf');
+            const iconClass = isPdf ? 'bi-file-earmark-pdf text-danger' : 'bi-file-earmark-word text-primary';
+
+            li.innerHTML = `
+                <div class="text-truncate" style="max-width: 65%;">
+                    <i class="bi ${iconClass} me-2"></i>
+                    <span class="badge bg-secondary me-1">${doc.document_type}</span>
+                    <span title="${doc.original_name}">${doc.original_name}</span>
+                </div>
+                <div class="btn-group btn-group-sm">
+                    <!-- Кнопка "Переглянути" -->
+                    <a href="${viewUrl}" target="_blank" class="btn btn-outline-primary" title="Відкрити">
+                        <i class="bi bi-eye"></i>
+                    </a>
+                    <!-- Кнопка "Завантажити" -->
+                    <a href="${downloadUrl}" class="btn btn-outline-success" title="Завантажити">
+                        <i class="bi bi-download"></i>
+                    </a>
+                    <!-- Кнопка "Видалити" -->
+                    <button type="button" class="btn btn-outline-danger" onclick="deleteDoc(${doc.id}, ${recordId})" title="Видалити">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            `;
+            list.appendChild(li);
+        });
+    } catch (err) {
+        list.innerHTML = `<li class="list-group-item text-danger">Помилка: ${err.message}</li>`;
+    }
+}
+
+// ВИПРАВЛЕНО: Обробка форми завантаження
+const uploadDocForm = document.getElementById("uploadDocForm");
+if (uploadDocForm) {
+    uploadDocForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        
+        // 1. Беремо ID запису ВИКЛЮЧНО з прихованого поля (ніяких currentRecordId)
+        const recordId = document.getElementById("docRowId").value;
+        const fileInput = document.getElementById("uploadFile");
+        const docType = document.getElementById("uploadDocType").value;
+
+        if (!fileInput.files[0]) return alert("Оберіть файл!");
+
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+        formData.append("tableName", tableName);
+        formData.append("recordId", recordId); // Передаємо правильну змінну recordId
+        formData.append("documentType", docType);
+
+        try {
+            const res = await fetch("/api/documents/upload", {
+                method: "POST",
+                body: formData
+            });
+            const result = await res.json();
+
+            if (res.ok) {
+                fileInput.value = ""; // Очищаємо поле після успішного завантаження
+                await loadUploadedDocs(recordId); // Оновлюємо список файлів, використовуючи recordId
+            } else {
+                alert("Помилка: " + result.error);
+            }
+        } catch (err) {
+            alert("Не вдалося завантажити файл. Перевірте консоль.");
+            console.error("Upload error:", err);
+        }
+    });
+}
+
+// Функція видалення
+async function deleteDoc(docId, recordId) {
+    if (!confirm("Видалити цей документ?")) return;
+    try {
+        const res = await fetch(`/api/documents/${docId}`, { method: 'DELETE' });
+        if (res.ok) await loadUploadedDocs(recordId);
+    } catch (err) { alert("Помилка видалення"); }
+}
+
+const originalFetch = window.fetch;
+window.fetch = async function(resource, config = {}) {
+    const token = localStorage.getItem('jwt_token');
+    if(!token) { window.location.href = '/'; return; }
+    
+    if (typeof resource === 'string' && (resource.includes('/api/') || resource.includes('/upload')) && !resource.includes('/auth/')) {
+        config.headers = config.headers || {};
+        if (!(config.body instanceof FormData)) { config.headers['Content-Type'] = config.headers['Content-Type'] || 'application/json'; }
+        
+        if (config.headers instanceof Headers) { config.headers.set('Authorization', `Bearer ${token}`); } 
+        else { config.headers['Authorization'] = `Bearer ${token}`; }
+    }
+    
+    const response = await originalFetch(resource, config);
+    if(response.status === 401 && typeof resource === 'string' && !resource.includes('/auth/')) {
+        localStorage.removeItem('jwt_token');
+        window.location.href = '/';
+    }
+    return response;
+};
+
+function logout() {
+    localStorage.removeItem('jwt_token');
+    window.location.href = '/';
 }
 
 // Завантажуємо таблицю при старті

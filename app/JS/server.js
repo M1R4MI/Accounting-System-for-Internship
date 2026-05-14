@@ -16,10 +16,6 @@ const { error } = require("console");
 const dateTime = auxiliary.getDateTime();
 
 const app = express();
-const upload = multer({
-    dest: path.join(__dirname, "uploads/"),
-    limits: {fileSize: 10 * 1024 * 1024} //10 MB
- });
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_internship_key';
 
@@ -45,12 +41,34 @@ const authenticateToken = (req, res, next) => {
     });
 
     app.use(cors());
-    app.use(bodyParser.json());
+    app.use(express.json());
     app.use(express.static("./public"));
     app.use(express.static("./public/html"));
     app.use("/css", express.static("./public/css"));
     app.use("/JS", express.static(__dirname));
     app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+
+    //Створення папки для файлів(якщо її немає)
+    const uploadDir = path.join(process.cwd(), 'uploads');
+    if(!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir);
+    }
+
+    //Налаштування для зберігання файлів
+    const storage = multer.diskStorage({
+      destination: function (req, file, cb) {
+        cb(null, 'uploads/');
+      },
+      filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        cb(null, uniqueSuffix + ext);
+      }
+    });
+    const upload = multer({
+        storage: storage
+    });
 
        // 1. Користувачі
     await db.query(`
@@ -471,31 +489,113 @@ const authenticateToken = (req, res, next) => {
         }
     });
 
-    app.post('/api/documents/upload', authenticateToken, upload.single('document'), async (req, res) => {
-        if (!req.file) return res.status(400).json({ error: 'Файл не надано' });
-        const { table_name, row_id, document_type } = req.body; 
-        const filePath = `/uploads/${req.file.filename}`;
+    app.post("/api/documents/upload", authenticateToken, upload.single('file'), async (req, res) => {
+        if (!req.file) return res.status(400).json({ error: "Файл не отримано" });
+        
         try {
+            const { tableName, recordId, documentType } = req.body;
+
+            const [meta] = await db.query('SELECT id FROM meta_tables WHERE tableName = ?', [tableName]);
+            if (meta.length === 0) throw new Error("Таблицю не знайдено");
+            const registry_id = meta[0].id;
+
+            const [record] = await db.query(`SELECT student_id FROM \`${tableName}\` WHERE ID = ?`, [recordId]);
+            if (record.length === 0) throw new Error("Запис не знайдено");
+            const student_id = record[0].student_id;
+
+            // ЗМІНЕНО: Беремо ТІЛЬКИ назву файлу (наприклад, 168432345-12345.pdf)
+            const filePath = req.file.filename; 
+            const originalName = req.file.originalname;
+
             await db.query(
-                'INSERT INTO documents (table_name, row_id, document_type, file_path, original_name) VALUES (?, ?, ?, ?, ?)',
-                [table_name, row_id, document_type || 'other', filePath, req.file.originalname]
+                'INSERT INTO documents (student_id, registry_id, document_type, file_path, original_name) VALUES (?, ?, ?, ?, ?)',
+                [student_id, registry_id, documentType, filePath, originalName]
             );
-            res.json({ message: 'Файл збережено', filePath });
-        } catch (error) {
-            fs.unlinkSync(req.file.path);
-            res.status(500).json({ error: 'Помилка бази даних' });
+
+            res.json({ message: "Успішно завантажено" });
+        } catch (err) {
+            if (req.file) fs.unlinkSync(req.file.path); // Видалити битий файл, якщо сталася помилка БД
+            console.error(err);
+            res.status(500).json({ error: err.message });
         }
     });
 
-    app.get('/api/documents/:tableName/:rowId', authenticateToken, async (req, res) => {
+    app.get("/api/documents/download/:id", async (req, res) => {
         try {
-            const [docs] = await db.query(
-                'SELECT id, document_type, file_path, original_name, uploaded_at FROM documents WHERE table_name = ? AND row_id = ?',
-                [req.params.tableName, req.params.rowId]
-            );
+            const docId = req.params.id;
+            
+            // Шукаємо файл у базі
+            const [docs] = await db.query('SELECT file_path, original_name FROM documents WHERE id = ?', [docId]);
+            if (docs.length === 0) return res.status(404).send("Файл не знайдено в базі даних");
+
+            const doc = docs[0];
+            
+            const pureFileName = doc.file_path.split(/[\/\\]/).pop(); 
+            
+            const absolutePath = path.join(process.cwd(), 'uploads', pureFileName);
+
+            if (!fs.existsSync(absolutePath)) {
+                return res.status(404).send("Файл фізично відсутній на сервері (можливо, видалений)");
+            }
+
+            const action = req.query.action; // 'view' або 'download'
+            
+            if (action === 'view' && doc.original_name.toLowerCase().endsWith('.pdf')) {
+                // Вказуємо браузеру ВІДКРИТИ PDF прямо у вкладці
+                res.contentType('application/pdf');
+                res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(doc.original_name)}"`);
+                fs.createReadStream(absolutePath).pipe(res);
+            } else {
+                // Примусово ЗАВАНТАЖУЄМО файл (для Word, Excel та кнопки "Завантажити")
+                res.download(absolutePath, doc.original_name);
+            }
+        } catch (err) {
+            console.error("Помилка завантаження файлу:", err);
+            res.status(500).send("Помилка сервера");
+        }
+    });
+
+    app.get("/api/documents/:tableName/:recordId", authenticateToken, async (req, res) => {
+        try {
+            const { tableName, recordId } = req.params;
+
+            // Знаходимо ID реєстру (таблиці)
+            const [meta] = await db.query('SELECT id FROM meta_tables WHERE tableName = ?', [tableName]);
+            if (meta.length === 0) return res.status(404).json({error: "Таблицю не знайдено"});
+            const registry_id = meta[0].id;
+
+            // Знаходимо student_id у цьому записі
+            const [record] = await db.query(`SELECT student_id FROM \`${tableName}\` WHERE ID = ?`, [recordId]);
+            if (record.length === 0) return res.status(404).json({error: "Запис не знайдено"});
+            const student_id = record[0].student_id;
+
+            // Отримуємо документи
+            const [docs] = await db.query('SELECT * FROM documents WHERE registry_id = ? AND student_id = ?', [registry_id, student_id]);
             res.json(docs);
         } catch (err) {
-            res.status(500).json({ error: err.message });
+            console.error("Помилка завантаження файлів:", err);
+            res.status(500).json({ error: "Помилка завантаження файлів" });
+        }
+    });
+
+    app.delete("/api/documents/:id", authenticateToken, async (req, res) => {
+        try {
+            const docId = req.params.id;
+            const [docs] = await db.query('SELECT file_path FROM documents WHERE id = ?', [docId]);
+            
+            if (docs.length > 0) {
+                const filePath = docs[0].file_path;
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath); // Видаляємо фізично
+                }
+                await db.query('DELETE FROM documents WHERE id = ?', [docId]);
+                res.json({ message: "Файл видалено" });
+            } else {
+                res.status(404).json({ error: "Файл не знайдено" });
+            }
+        } catch (err) {
+            console.error("Помилка видалення файлу:", err);
+            res.status(500).json({ error: "Помилка видалення файлу" });
         }
     });
 
@@ -507,16 +607,21 @@ const authenticateToken = (req, res, next) => {
           
           // Робимо правильний JOIN з новими таблицями students та student_groups
           const [rows] = await db.query(`
-              SELECT t.ID, t.student_id, 
-                    s.record_book_number AS RegistrationNumber, 
+              SELECT t.ID, t.student_id,
+                    t.RegistrationNumber, 
+                    s.record_book_number, 
                     DATE_FORMAT(t.RegistrationDate, '%Y-%m-%d') AS RegistrationDate, 
                     s.full_name AS StudentName, 
                     sg.group_name AS StudentGroup, 
-                    t.Information, t.Contact, t.DocumentType, t.SigningStatus, t.OccupationalSafety
+                    t.Information,
+                    t.Contact, 
+                    t.DocumentType, 
+                    t.SigningStatus, 
+                    t.OccupationalSafety
               FROM \`${tableName}\` t
               JOIN students s ON t.student_id = s.id
               JOIN student_groups sg ON s.group_id = sg.id
-              ORDER BY t.ID DESC
+              ORDER BY t.ID ASC
           `);
           res.json(rows);
       } catch (err) {
@@ -553,13 +658,15 @@ const authenticateToken = (req, res, next) => {
           
           if (!student_id) return res.status(400).json({error: "Не обрано студента"});
 
+          const RegistrationNumber = await auxiliary.generateRegistrationNumber(tableName, '08-32', db);
+
           const sql = `INSERT INTO \`${tableName}\` 
-              (student_id, RegistrationDate, Information, Contact, DocumentType, SigningStatus, OccupationalSafety) 
-              VALUES (?, ?, ?, ?, ?, ?, ?)`;
+              ( student_id, RegistrationNumber, RegistrationDate, Information, Contact, DocumentType, SigningStatus, OccupationalSafety) 
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
           
-          await db.query(sql, [student_id, RegistrationDate, Information, Contact, DocumentType, SigningStatus, OccupationalSafety]);
+          await db.query(sql, [ student_id, RegistrationNumber, RegistrationDate, Information, Contact, DocumentType, SigningStatus, OccupationalSafety]);
           
-          res.json({ message: "Успішно додано" });
+          res.json({ message: "Успішно додано", RegistrationNumber });
       } catch (err) {
           console.error("Помилка збереження запису:", err);
           res.status(500).json({ error: "Помилка збереження в БД" });
@@ -567,123 +674,175 @@ const authenticateToken = (req, res, next) => {
     });
 
     // Пошук у таблиці
-    app.get("/api/table/:tableName/search/:input", authenticateToken, async (req, res) => {
-      const tableName = req.params.tableName;
-      const input = req.params.input;
-      if (!input) {
-        return res
-          .status(400)
-          .json({ error: "Missing required query parameter: input" });
-      }
+    app.get("/api/table/:tableName/search/:query", authenticateToken, async (req, res) => {
       try {
-        // Перевірка імені таблиці
-        auxiliary.safeTableName(tableName);
-        const [results] = await auxiliary.searchInTable(tableName, input, db);
-        const formattedResults = results.map((row) => ({
-          ...row,
-          RegistrationDate: dateFormat(row["RegistrationDate"]).format(
-            "DD-MM-YYYY"
-          ),
-        }));
-        res.json(formattedResults);
+        const { tableName, query } = req.params;
+        if (!/^[a-zA-Z0-9_]+$/.test(tableName)) return res.status(400).json({error: "Невірна назва таблиці"});
+
+        const searchParam = `%${query}%`;
+        const sql = `
+            SELECT t.ID, t.student_id, 
+                  t.RegistrationNumber, 
+                  s.record_book_number,
+                  DATE_FORMAT(t.RegistrationDate, '%Y-%m-%d') AS RegistrationDate, 
+                  s.full_name AS StudentName, 
+                  sg.group_name AS StudentGroup, 
+                  t.Information, t.Contact, t.DocumentType, t.SigningStatus, t.OccupationalSafety
+            FROM \`${tableName}\` t
+            JOIN students s ON t.student_id = s.id
+            JOIN student_groups sg ON s.group_id = sg.id
+            WHERE s.full_name LIKE ? 
+              OR sg.group_name LIKE ?
+              OR t.RegistrationNumber LIKE ?
+              OR s.record_book_number LIKE ?
+            ORDER BY t.ID ASC
+        `;
+        
+        const [rows] = await db.query(sql, [searchParam, searchParam, searchParam, searchParam]);
+        res.json(rows);
       } catch (err) {
-        console.error("Error in GET /api/table/:tableName/search/:input:", err);
-        res
-          .status(500)
-          .json({ error: "Internal Server Error", details: err.message });
+          console.error("Помилка пошуку:", err);
+          res.status(500).json({ error: "Помилка пошуку" });
       }
     });
 
     // Сортування таблиці
     app.get("/api/table/:tableName/sort", authenticateToken, async (req, res) => {
-      const tableName = req.params.tableName;
-      const sortBy = req.query.by || "StudentName";
-      const order = req.query.order === "asc" ? "ASC" : "DESC";
-      try {
-        const [results] = await db.query(
-          `SELECT * FROM \`${tableName}\` ORDER BY \`${sortBy}\` ${order}`
-        );
-        const formattedResults = results.map((row) => ({
-          ...row,
-          RegistrationDate: dateFormat(row["RegistrationDate"]).format(
-            "DD-MM-YYYY"
-          ),
-        }));
-        res.json(formattedResults);
-      } catch (err) {
-        res
-          .status(500)
-          .json({ error: "Cannot sort table", details: err.message });
-      }
+        try {
+            const { tableName } = req.params;
+            let { by, order } = req.query;
+            if (!/^[a-zA-Z0-9_]+$/.test(tableName)) return res.status(400).json({error: "Невірна назва таблиці"});
+            
+            // Мапа безпечних колонок для сортування (запобігає SQL Injection)
+            const allowedSortColumns = {
+                'RegistrationNumber': 't.RegistrationNumber',
+                'record_book_number': 's.record_book_number',
+                'RegistrationDate': 't.RegistrationDate',
+                'StudentName': 's.full_name',
+                'StudentGroup': 'sg.group_name'
+            };
+            
+            const sortColumn = allowedSortColumns[by] || 't.ID';
+            const sortOrder = (order && order.toUpperCase() === 'ASC') ? 'ASC' : 'DESC';
+
+            const sql = `
+                SELECT t.ID, t.student_id, 
+                      t.RegistrationNumber, 
+                      s.record_book_number,
+                      DATE_FORMAT(t.RegistrationDate, '%Y-%m-%d') AS RegistrationDate, 
+                      s.full_name AS StudentName, 
+                      sg.group_name AS StudentGroup, 
+                      t.Information, t.Contact, t.DocumentType, t.SigningStatus, t.OccupationalSafety
+                FROM \`${tableName}\` t
+                JOIN students s ON t.student_id = s.id
+                JOIN student_groups sg ON s.group_id = sg.id
+                ORDER BY ${sortColumn} ${sortOrder}
+            `;
+            
+            const [rows] = await db.query(sql);
+            res.json(rows);
+        } catch (err) {
+            console.error("Помилка сортування:", err);
+            res.status(500).json({ error: "Помилка сортування" });
+        }
     });
 
     // Експорт таблиці
     app.get("/api/table/:tableName/export", authenticateToken, async (req, res) => {
-      const tableName = req.params.tableName;
-      if (!tableName) {
-        return res.status(400).send("Table name is required");
-      }
-      try {
-        const [rows] = await db.query(`SELECT * FROM ${tableName}`);
-        const workbook = new ExcelJs.Workbook();
-        const worksheet = workbook.addWorksheet(tableName);
-        if (rows.length > 0) {
-          worksheet.columns = Object.keys(rows[0]).map((key) => ({
-            header: key,
-            key: key,
-            width: 20,
-          }));
-          rows.forEach((row) => worksheet.addRow(row));
+        try {
+          const tableName = req.params.tableName;
+          if (!/^[a-zA-Z0-9_]+$/.test(tableName)) return res.status(400).json({error: "Невірна назва таблиці"});
+
+          // Отримуємо опис таблиці, щоб гарно назвати аркуш в Excel
+          const [meta] = await db.query('SELECT descriptionField FROM meta_tables WHERE tableName = ?', [tableName]);
+          const sheetName = meta.length > 0 && meta[0].descriptionField ? meta[0].descriptionField.substring(0, 31) : 'Відомість';
+
+          // Робимо правильний JOIN для витягування всіх імен
+          const sql = `
+              SELECT 
+                  t.RegistrationNumber AS 'Реєстр. номер',
+                  s.record_book_number AS 'Заліковка',
+                  DATE_FORMAT(t.RegistrationDate, '%d.%m.%Y') AS 'Дата реєстрації',
+                  s.full_name AS 'ПІБ студента',
+                  sg.group_name AS 'Група',
+                  t.Information AS 'Місце практики',
+                  t.Contact AS 'Контактна особа',
+                  t.DocumentType AS 'Вид документу',
+                  t.SigningStatus AS 'Статус підписання',
+                  t.OccupationalSafety AS 'Інструктаж з ОП'
+              FROM \`${tableName}\` t
+              JOIN students s ON t.student_id = s.id
+              JOIN student_groups sg ON s.group_id = sg.id
+              ORDER BY t.ID ASC
+          `;
+          
+          const [rows] = await db.query(sql);
+
+          const workbook = xlsx.utils.book_new();
+          const worksheet = xlsx.utils.json_to_sheet(rows);
+
+          // Налаштовуємо ширину колонок для красивого Excel файлу
+          const colWidths = [
+              { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 35 }, { wch: 10 }, 
+              { wch: 25 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }
+          ];
+          worksheet['!cols'] = colWidths;
+
+          xlsx.utils.book_append_sheet(workbook, worksheet, sheetName);
+          const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+          res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(tableName)}.xlsx"`);
+          res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+          res.send(buffer);
+        } catch (err) {
+            console.error("Помилка експорту:", err);
+            res.status(500).json({ error: "Помилка генерації Excel файлу" });
         }
-        res.setHeader(
-          "Content-Type",
-          "application/wnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        );
-        res.setHeader(
-          "Content-Description",
-          `attachment; filename=${tableName}.xlsx`
-        );
-        await workbook.xlsx.write(res);
-        res.end();
-      } catch (err) {
-        console.error("Error exporting table to Excel: ", err);
-        res.status(500).send("Internal server error");
-      }
     });
 
     //--HTTP clone row in table method--
     app.post("/api/table/:tableName/clone/:id", authenticateToken, async (req, res) => {
-      const tableName = req.params.tableName;
-      const id = req.params.id;
-      try {
-        const [rows] = await db.query(
-          `SELECT * FROM \`${tableName}\` WHERE id = ?`,
-          [id]
-        );
-        if (rows.length === 0) {
-          return res.status(404).json({ error: "Row not found" });
+        try {
+            const { tableName, id } = req.params;
+            if (!/^[a-zA-Z0-9_]+$/.test(tableName)) return res.status(400).json({error: "Невірна назва таблиці"});
+
+            // 1. Отримуємо оригінальний запис
+            const [rows] = await db.query(`SELECT * FROM \`${tableName}\` WHERE ID = ?`, [id]);
+            if (rows.length === 0) return res.status(404).json({ error: "Оригінальний запис не знайдено" });
+
+            const original = rows[0];
+
+            // 2. БЕРЕМО НОМЕР ТА ДАТУ З ОРИГІНАЛУ
+            // Більше нічого не генеруємо, просто копіюємо існуючий номер
+            const registrationNumber = original.RegistrationNumber;
+            
+            // Також логічно зберегти оригінальну дату реєстрації угоди
+            const registrationDate = original.RegistrationDate; 
+
+            // 3. Вставляємо клон у базу даних
+            const sql = `INSERT INTO \`${tableName}\` 
+                (student_id, RegistrationNumber, RegistrationDate, Information, Contact, DocumentType, SigningStatus, OccupationalSafety) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+            
+            await db.query(sql, [
+                original.student_id, 
+                registrationNumber, // Передаємо скопійований номер
+                registrationDate,   // Передаємо скопійовану дату
+                original.Information, 
+                original.Contact, 
+                original.DocumentType, 
+                original.SigningStatus, 
+                original.OccupationalSafety
+            ]);
+
+            res.json({ 
+                message: "Запис успішно клоновано", 
+                RegistrationNumber: registrationNumber 
+            });
+        } catch (err) {
+            console.error("Помилка клонування:", err);
+            res.status(500).json({ error: "Помилка клонування запису" });
         }
-        const row = rows[0];
-        
-        // Remove ID field (handle both 'id' and 'ID' cases)
-        delete row.id;
-        delete row.ID;
-
-        // Build INSERT query with proper placeholders
-        const columns = Object.keys(row).filter(col => col.toLowerCase() !== 'id');
-        const values = columns.map(col => row[col]);
-        const placeholders = columns.map(() => "?").join(", ");
-        const columnsList = columns.map((col) => `\`${col}\``).join(", ");
-
-        const [results] = await db.query(
-          `INSERT INTO \`${tableName}\` (${columnsList}) VALUES (${placeholders})`,
-          values
-        );
-        res.json({ id: results.insertId });
-      } catch (err) {
-        console.error("Clone error:", err);
-        res.status(500).json({ error: err.message });
-      }
     });
 
     //--HTTP edit row in table method--
